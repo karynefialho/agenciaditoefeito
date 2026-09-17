@@ -26,7 +26,7 @@ export const listClients = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("clients")
-      .select("id, name, ig_username, ig_user_id, created_at")
+      .select("id, name, ig_username, ig_user_id, whatsapp_phone, created_at")
       .order("name");
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -34,19 +34,96 @@ export const listClients = createServerFn({ method: "GET" })
 
 export const createClient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { name: string }) => {
+  .inputValidator((input: { name: string; whatsapp?: string | undefined }) => {
     const name = input.name.trim();
     if (!name) throw new Error("Informe o nome do cliente.");
-    return { name };
+    return { name, whatsapp: input.whatsapp?.trim() || null };
   })
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
       .from("clients")
-      .insert({ name: data.name, created_by: context.userId })
+      .insert({ name: data.name, whatsapp_phone: data.whatsapp, created_by: context.userId })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
     return row;
+  });
+
+export const updateClientWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { clientId: string; whatsapp: string }) => ({
+    clientId: input.clientId,
+    whatsapp: input.whatsapp.trim(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode alterar o WhatsApp.");
+    const { error } = await context.supabase
+      .from("clients")
+      .update({ whatsapp_phone: data.whatsapp || null })
+      .eq("id", data.clientId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listFeed = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: posts, error } = await context.supabase
+      .from("posts")
+      .select("id, client_id, kind, caption, scheduled_at, status, clients(name, ig_username)")
+      .order("scheduled_at", { ascending: false })
+      .limit(60);
+    if (error) throw new Error(error.message);
+    if (!posts?.length) return [];
+
+    const { data: media } = await context.supabase
+      .from("post_media")
+      .select("post_id, path, media_type, position")
+      .in("post_id", posts.map((p) => p.id))
+      .order("position", { ascending: true });
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const cover = new Map<string, { path: string; media_type: string }>();
+    for (const m of media ?? []) {
+      if (!cover.has(m.post_id)) cover.set(m.post_id, { path: m.path, media_type: m.media_type });
+    }
+
+    const items = [] as {
+      id: string;
+      status: string;
+      kind: string;
+      caption: string;
+      scheduled_at: string;
+      clientName: string;
+      url: string;
+      mediaType: string;
+    }[];
+
+    for (const post of posts) {
+      const c = cover.get(post.id);
+      let url = "";
+      if (c) {
+        const { data: signed } = await supabaseAdmin.storage
+          .from("post-media")
+          .createSignedUrl(c.path, 60 * 60);
+        url = signed?.signedUrl ?? "";
+      }
+      items.push({
+        id: post.id,
+        status: post.status,
+        kind: post.kind,
+        caption: post.caption,
+        scheduled_at: post.scheduled_at,
+        clientName: (post as { clients?: { name?: string } }).clients?.name ?? "Cliente",
+        url,
+        mediaType: c?.media_type ?? "image",
+      });
+    }
+    return items;
   });
 
 export const connectInstagram = createServerFn({ method: "POST" })
@@ -221,12 +298,24 @@ export const createPost = createServerFn({ method: "POST" })
     );
     if (mediaError) throw new Error(mediaError.message);
 
+    try {
+      const { notifyReadyForApproval } = await import("@/lib/notify.server");
+      await notifyReadyForApproval(post.id);
+    } catch {
+      // o post continua criado mesmo se o aviso falhar
+    }
+
     return post;
   });
 
 export const reviewPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string; approve: boolean; feedback?: string | undefined }) => input)
+  .inputValidator((input: { id: string; approve: boolean; feedback?: string | undefined }) => {
+    if (!input.approve && !input.feedback?.trim()) {
+      throw new Error("Conte o que você quer que seja alterado.");
+    }
+    return input;
+  })
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("posts")
