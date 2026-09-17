@@ -18,8 +18,16 @@ export const Route = createFileRoute("/api/public/hooks/publish-scheduled")({
         }
 
         const { publishDuePosts } = await import("@/lib/publish.server");
+        const { sendApprovalReminders } = await import("@/lib/notify.server");
+
         const results = await publishDuePosts();
-        return Response.json({ processed: results.length, results });
+        const reminders = await sendApprovalReminders();
+
+        return Response.json({
+          processed: results.length,
+          reminders: reminders.length,
+          results,
+        });
       },
     },
   },

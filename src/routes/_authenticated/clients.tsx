@@ -13,6 +13,7 @@ import {
   getMe,
   inviteClientUser,
   listClients,
+  updateClientWhatsapp,
 } from "@/lib/app.functions";
 
 export const Route = createFileRoute("/_authenticated/clients")({
@@ -40,11 +41,13 @@ function ClientsPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const clients = useQuery({ queryKey: ["clients"], queryFn: () => listClients() });
   const [name, setName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
 
   const addClient = useMutation({
-    mutationFn: () => createClient({ data: { name } }),
+    mutationFn: () => createClient({ data: { name, whatsapp } }),
     onSuccess: () => {
       setName("");
+      setWhatsapp("");
       toast.success("Cliente cadastrado.");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     },
@@ -78,6 +81,11 @@ function ClientsPage() {
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
+        <Input
+          placeholder="WhatsApp (55 11 99999-9999)"
+          value={whatsapp}
+          onChange={(event) => setWhatsapp(event.target.value)}
+        />
         <Button type="submit" disabled={addClient.isPending || !name.trim()}>
           Adicionar
         </Button>
@@ -100,13 +108,29 @@ function ClientCard({
   client,
   onChanged,
 }: {
-  client: { id: string; name: string; ig_username: string | null; ig_user_id: string | null };
+  client: {
+    id: string;
+    name: string;
+    ig_username: string | null;
+    ig_user_id: string | null;
+    whatsapp_phone: string | null;
+  };
   onChanged: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [igUserId, setIgUserId] = useState(client.ig_user_id ?? "");
   const [igUsername, setIgUsername] = useState(client.ig_username ?? "");
   const [token, setToken] = useState("");
+  const [phone, setPhone] = useState(client.whatsapp_phone ?? "");
+
+  const saveWhatsapp = useMutation({
+    mutationFn: () => updateClientWhatsapp({ data: { clientId: client.id, whatsapp: phone } }),
+    onSuccess: () => {
+      toast.success("WhatsApp salvo.");
+      onChanged();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
+  });
 
   const invite = useMutation({
     mutationFn: () => inviteClientUser({ data: { clientId: client.id, email } }),
@@ -159,6 +183,29 @@ function ClientCard({
               Convidar
             </Button>
           </div>
+        </form>
+
+        <form
+          className="space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveWhatsapp.mutate();
+          }}
+        >
+          <Label>WhatsApp do cliente</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="55 11 99999-9999"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+            <Button type="submit" variant="outline" disabled={saveWhatsapp.isPending}>
+              Salvar
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Usado para avisar sobre conteúdo novo, lembrete de aprovação e publicação.
+          </p>
         </form>
 
         <form

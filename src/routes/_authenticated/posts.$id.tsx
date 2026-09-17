@@ -31,12 +31,15 @@ function PostDetail() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const post = useQuery({ queryKey: ["post", id], queryFn: () => getPost({ data: { id } }) });
   const [feedback, setFeedback] = useState("");
+  const [celebrate, setCelebrate] = useState(false);
 
   const review = useMutation({
     mutationFn: (approve: boolean) =>
       reviewPost({ data: { id, approve, feedback: feedback || undefined } }),
     onSuccess: (_result, approve) => {
-      toast.success(approve ? "Post aprovado!" : "Pedido de ajuste enviado.");
+      if (approve) setCelebrate(true);
+      toast.success(approve ? "Post aprovado!" : "Pedido de alteração enviado.");
+      setFeedback("");
       queryClient.invalidateQueries({ queryKey: ["post", id] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
@@ -116,33 +119,47 @@ function PostDetail() {
             <h2 className="font-medium">
               {data.status === "published" ? "Publicado" : "Aprovação"}
             </h2>
+            {celebrate && (
+              <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-center">
+                <div className="text-3xl">🎉</div>
+                <p className="mt-2 text-sm font-medium text-emerald-900">
+                  Obrigada pela aprovação!
+                </p>
+                <p className="mt-1 text-xs text-emerald-800">
+                  Seu post já está garantido e vai ao ar no horário combinado. Você recebe um
+                  WhatsApp assim que ele for publicado.
+                </p>
+              </div>
+            )}
             {data.status === "published" ? (
               <p className="text-sm text-muted-foreground">
                 Este conteúdo já foi para o Instagram.
               </p>
             ) : (
               <>
-                <Textarea
-                  rows={4}
-                  placeholder="Comentário ou pedido de ajuste (opcional)"
-                  value={feedback}
-                  onChange={(event) => setFeedback(event.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    disabled={review.isPending}
-                    onClick={() => review.mutate(true)}
-                  >
-                    Aprovar
-                  </Button>
+                <Button
+                  className="w-full"
+                  disabled={review.isPending}
+                  onClick={() => review.mutate(true)}
+                >
+                  Aprovar conteúdo
+                </Button>
+                <div className="rounded-lg border p-3">
+                  <p className="text-sm font-medium">Pedir alteração</p>
+                  <Textarea
+                    className="mt-2"
+                    rows={4}
+                    placeholder="Conte o que você quer que seja alterado (texto, foto, ordem...)"
+                    value={feedback}
+                    onChange={(event) => setFeedback(event.target.value)}
+                  />
                   <Button
                     variant="outline"
-                    className="flex-1"
-                    disabled={review.isPending}
+                    className="mt-2 w-full"
+                    disabled={review.isPending || !feedback.trim()}
                     onClick={() => review.mutate(false)}
                   >
-                    Pedir ajuste
+                    Enviar pedido de alteração
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">

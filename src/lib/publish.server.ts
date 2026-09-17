@@ -64,6 +64,12 @@ export async function publishPostById(postId: string) {
         error_message: null,
       })
       .eq("id", row.id);
+    try {
+      const { notifyPublished } = await import("./notify.server");
+      await notifyPublished(row.id);
+    } catch {
+      // a falha no aviso não deve derrubar a publicação
+    }
     return { igMediaId };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

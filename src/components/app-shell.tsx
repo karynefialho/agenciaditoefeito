@@ -39,6 +39,13 @@ export function AppShell({
             >
               Posts
             </Link>
+            <Link
+              to="/feed"
+              className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground" }}
+            >
+              Feed
+            </Link>
             {isAdmin && (
               <>
                 <Link
