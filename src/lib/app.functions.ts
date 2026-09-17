@@ -51,7 +51,7 @@ export const createClient = createServerFn({ method: "POST" })
 
 export const connectInstagram = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { clientId: string; igUserId: string; accessToken: string; igUsername?: string }) => input)
+  .inputValidator((input: { clientId: string; igUserId: string; accessToken: string; igUsername?: string | undefined }) => input)
   .handler(async ({ data, context }) => {
     const { data: isAdmin } = await context.supabase.rpc("has_role", {
       _user_id: context.userId,
@@ -226,7 +226,7 @@ export const createPost = createServerFn({ method: "POST" })
 
 export const reviewPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string; approve: boolean; feedback?: string }) => input)
+  .inputValidator((input: { id: string; approve: boolean; feedback?: string | undefined }) => input)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("posts")
