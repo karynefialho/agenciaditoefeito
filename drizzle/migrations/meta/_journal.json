@@ -8,6 +8,13 @@
       "when": 1789687756259,
       "tag": "0000_create_approval_and_instagram_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789688524385,
+      "tag": "0001_add_whatsapp_notifications",
+      "breakpoints": true
     }
   ]
 }

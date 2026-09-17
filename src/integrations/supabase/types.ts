@@ -48,6 +48,7 @@ export type Database = {
           ig_user_id: string | null
           ig_username: string | null
           name: string
+          whatsapp_phone: string | null
         }
         Insert: {
           created_at?: string
@@ -56,6 +57,7 @@ export type Database = {
           ig_user_id?: string | null
           ig_username?: string | null
           name: string
+          whatsapp_phone?: string | null
         }
         Update: {
           created_at?: string
@@ -64,6 +66,7 @@ export type Database = {
           ig_user_id?: string | null
           ig_username?: string | null
           name?: string
+          whatsapp_phone?: string | null
         }
         Relationships: []
       }
@@ -144,7 +147,10 @@ export type Database = {
           id: string
           ig_media_id: string | null
           kind: Database["public"]["Enums"]["post_kind"]
+          notified_published_at: string | null
+          notified_ready_at: string | null
           published_at: string | null
+          reminder_sent_at: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["post_status"]
           updated_at: string
@@ -161,7 +167,10 @@ export type Database = {
           id?: string
           ig_media_id?: string | null
           kind?: Database["public"]["Enums"]["post_kind"]
+          notified_published_at?: string | null
+          notified_ready_at?: string | null
           published_at?: string | null
+          reminder_sent_at?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["post_status"]
           updated_at?: string
@@ -178,7 +187,10 @@ export type Database = {
           id?: string
           ig_media_id?: string | null
           kind?: Database["public"]["Enums"]["post_kind"]
+          notified_published_at?: string | null
+          notified_ready_at?: string | null
           published_at?: string | null
+          reminder_sent_at?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["post_status"]
           updated_at?: string
@@ -231,6 +243,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      whatsapp_messages: {
+        Row: {
+          body: string
+          client_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          kind: string
+          phone: string
+          post_id: string | null
+          status: string
+        }
+        Insert: {
+          body: string
+          client_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kind: string
+          phone: string
+          post_id?: string | null
+          status?: string
+        }
+        Update: {
+          body?: string
+          client_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kind?: string
+          phone?: string
+          post_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
