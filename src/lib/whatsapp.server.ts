@@ -1,4 +1,4 @@
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/whatsapp";
 
 export const APP_URL = "https://project--66a8bc3a-2516-4787-aa9e-7e09284f5858.lovable.app";
 
@@ -46,18 +46,19 @@ export async function sendWhatsApp(args: {
     return { sent: false as const, reason: "no-phone" as const };
   }
 
-  const token = process.env["WHATSAPP_ACCESS_TOKEN"];
-  const phoneNumberId = process.env["WHATSAPP_PHONE_NUMBER_ID"];
-  if (!token || !phoneNumberId) {
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const connectionKey = process.env["WHATSAPP_API_KEY"];
+  if (!lovableKey || !connectionKey) {
     await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp não configurado" });
     return { sent: false as const, reason: "not-configured" as const };
   }
 
   try {
-    const response = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+    const response = await fetch(`${GATEWAY_URL}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": connectionKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
