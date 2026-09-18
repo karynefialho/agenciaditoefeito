@@ -69,11 +69,28 @@ export const updateClientWhatsapp = createServerFn({ method: "POST" })
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode alterar o WhatsApp.");
+    const { data: before } = await context.supabase
+      .from("clients")
+      .select("name, whatsapp_phone")
+      .eq("id", data.clientId)
+      .maybeSingle();
     const { error } = await context.supabase
       .from("clients")
       .update({ whatsapp_phone: data.whatsapp || null })
       .eq("id", data.clientId);
     if (error) throw new Error(error.message);
+    if (data.whatsapp && data.whatsapp !== before?.whatsapp_phone) {
+      try {
+        const { notifyWelcome } = await import("./notify.server");
+        await notifyWelcome({
+          clientId: data.clientId,
+          clientName: before?.name ?? "tudo bem?",
+          phone: data.whatsapp,
+        });
+      } catch (e) {
+        console.error("welcome whatsapp failed", e);
+      }
+    }
     return { ok: true };
   });
 
