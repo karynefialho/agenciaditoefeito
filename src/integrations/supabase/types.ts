@@ -99,6 +99,35 @@ export type Database = {
           },
         ]
       }
+      meta_oauth_sessions: {
+        Row: {
+          access_token: string
+          client_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          access_token: string
+          client_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          access_token?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_oauth_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_media: {
         Row: {
           created_at: string
