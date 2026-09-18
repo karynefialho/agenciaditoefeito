@@ -46,6 +46,14 @@ export const createClient = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    if (data.whatsapp) {
+      try {
+        const { notifyWelcome } = await import("./notify.server");
+        await notifyWelcome({ clientId: row.id, clientName: data.name, phone: data.whatsapp });
+      } catch (e) {
+        console.error("welcome whatsapp failed", e);
+      }
+    }
     return row;
   });
 
