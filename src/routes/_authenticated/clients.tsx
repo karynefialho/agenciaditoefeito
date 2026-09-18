@@ -242,19 +242,13 @@ function ClientCard({
 
         <div className="space-y-2">
           <Label>Conta do Instagram (via Meta Business)</Label>
-          <Input
-            type="password"
-            placeholder="Token do Meta Business"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
           <Button
             type="button"
             variant="outline"
-            disabled={discover.isPending || !token}
-            onClick={() => discover.mutate()}
+            disabled={startConnect.isPending}
+            onClick={() => startConnect.mutate()}
           >
-            {discover.isPending ? "Buscando perfis..." : "Buscar perfis"}
+            {startConnect.isPending ? "Abrindo a Meta..." : "Conectar com Meta Business"}
           </Button>
 
           {options.length > 0 && (
