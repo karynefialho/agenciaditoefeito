@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CalendarClock, CheckCircle2, Instagram } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -29,7 +30,7 @@ function Index() {
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <span className="text-lg font-semibold tracking-tight">Aprovô</span>
+        <BrandLogo className="h-7" />
         <Button asChild variant="outline">
           <Link to="/auth">Entrar</Link>
         </Button>

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +66,7 @@ function AuthPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm rounded-xl border bg-card p-8">
+        <BrandLogo className="mb-6 h-6" />
         <h1 className="text-2xl font-semibold tracking-tight">
           {mode === "signin" ? "Entrar" : "Criar conta"}
         </h1>
