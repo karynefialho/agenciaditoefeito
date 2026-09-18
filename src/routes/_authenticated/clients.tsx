@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  connectInstagram,
-  discoverInstagramAccounts,
+  connectMetaAccount,
+  listMetaSessionAccounts,
+  startMetaConnect,
   createClient,
   getMe,
   inviteClientUser,
@@ -121,7 +122,6 @@ function ClientCard({
   const [email, setEmail] = useState("");
   const [igUserId, setIgUserId] = useState(client.ig_user_id ?? "");
   const [igUsername, setIgUsername] = useState(client.ig_username ?? "");
-  const [token, setToken] = useState("");
   const [phone, setPhone] = useState(client.whatsapp_phone ?? "");
 
   const saveWhatsapp = useMutation({
@@ -145,27 +145,41 @@ function ClientCard({
   const [options, setOptions] = useState<
     { igUserId: string; username: string; pageName: string; picture: string }[]
   >([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const discover = useMutation({
-    mutationFn: () => discoverInstagramAccounts({ data: { accessToken: token } }),
-    onSuccess: (list) => {
-      setOptions(list);
-      if (list.length === 1 && list[0]) {
-        setIgUserId(list[0].igUserId);
-        setIgUsername(list[0].username);
-      }
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("meta_error");
+    if (error) toast.error(error);
+    const session = params.get("meta_session");
+    if (!session) return;
+    listMetaSessionAccounts({ data: { sessionId: session } })
+      .then((result) => {
+        if (result.clientId !== client.id) return;
+        setSessionId(session);
+        setOptions(result.accounts);
+        if (result.accounts.length === 1 && result.accounts[0]) {
+          setIgUserId(result.accounts[0].igUserId);
+          setIgUsername(result.accounts[0].username);
+        }
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startConnect = useMutation({
+    mutationFn: () => startMetaConnect({ data: { clientId: client.id } }),
+    onSuccess: (result) => {
+      window.location.href = result.url;
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
 
   const connect = useMutation({
-    mutationFn: () =>
-      connectInstagram({
-        data: { clientId: client.id, igUserId, accessToken: token, igUsername },
-      }),
+    mutationFn: () => connectMetaAccount({ data: { sessionId: sessionId ?? "", igUserId } }),
     onSuccess: () => {
-      setToken("");
       setOptions([]);
+      setSessionId(null);
       toast.success("Conta do Instagram conectada.");
       onChanged();
     },
@@ -228,19 +242,13 @@ function ClientCard({
 
         <div className="space-y-2">
           <Label>Conta do Instagram (via Meta Business)</Label>
-          <Input
-            type="password"
-            placeholder="Token do Meta Business"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
           <Button
             type="button"
             variant="outline"
-            disabled={discover.isPending || !token}
-            onClick={() => discover.mutate()}
+            disabled={startConnect.isPending}
+            onClick={() => startConnect.mutate()}
           >
-            {discover.isPending ? "Buscando perfis..." : "Buscar perfis"}
+            {startConnect.isPending ? "Abrindo a Meta..." : "Conectar com Meta Business"}
           </Button>
 
           {options.length > 0 && (
@@ -269,7 +277,7 @@ function ClientCard({
               ))}
               <Button
                 type="button"
-                disabled={connect.isPending || !igUserId}
+                disabled={connect.isPending || !igUserId || !sessionId}
                 onClick={() => connect.mutate()}
               >
                 Conectar perfil selecionado

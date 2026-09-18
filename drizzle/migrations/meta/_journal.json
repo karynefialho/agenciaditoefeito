@@ -15,6 +15,13 @@
       "when": 1789688524385,
       "tag": "0001_add_whatsapp_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789691558466,
+      "tag": "0002_create_meta_oauth_sessions",
+      "breakpoints": true
     }
   ]
 }
