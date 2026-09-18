@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,8 +29,8 @@ export function AppShell({
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-4">
-          <Link to="/dashboard" className="text-lg font-semibold tracking-tight">
-            Aprovô
+          <Link to="/dashboard" className="flex items-center">
+            <BrandLogo className="h-6" />
           </Link>
           <nav className="flex items-center gap-1 text-sm">
             <Link
