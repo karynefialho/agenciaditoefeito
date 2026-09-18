@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  connectInstagram,
-  discoverInstagramAccounts,
+  connectMetaAccount,
+  listMetaSessionAccounts,
+  startMetaConnect,
   createClient,
   getMe,
   inviteClientUser,
@@ -121,7 +122,6 @@ function ClientCard({
   const [email, setEmail] = useState("");
   const [igUserId, setIgUserId] = useState(client.ig_user_id ?? "");
   const [igUsername, setIgUsername] = useState(client.ig_username ?? "");
-  const [token, setToken] = useState("");
   const [phone, setPhone] = useState(client.whatsapp_phone ?? "");
 
   const saveWhatsapp = useMutation({
@@ -277,7 +277,7 @@ function ClientCard({
               ))}
               <Button
                 type="button"
-                disabled={connect.isPending || !igUserId}
+                disabled={connect.isPending || !igUserId || !sessionId}
                 onClick={() => connect.mutate()}
               >
                 Conectar perfil selecionado
