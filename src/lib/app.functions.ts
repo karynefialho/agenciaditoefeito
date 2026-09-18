@@ -435,3 +435,94 @@ export const discoverInstagramAccounts = createServerFn({ method: "POST" })
     }
     return accounts;
   });
+
+/** Returns the Meta login URL the agency uses to link a client's Instagram. */
+export const startMetaConnect = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { clientId: string }) => ({ clientId: input.clientId }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
+    const { metaAuthUrl } = await import("./meta.server");
+    return { url: metaAuthUrl(data.clientId) };
+  });
+
+/** Lists the Instagram profiles available after the Meta login. */
+export const listMetaSessionAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { sessionId: string }) => ({ sessionId: input.sessionId }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: session } = await supabaseAdmin
+      .from("meta_oauth_sessions")
+      .select("id, client_id, access_token")
+      .eq("id", data.sessionId)
+      .maybeSingle();
+    if (!session) throw new Error("Conexão expirada. Conecte novamente.");
+
+    const { listIgAccounts } = await import("./meta.server");
+    const accounts = await listIgAccounts(session.access_token);
+    return {
+      clientId: session.client_id,
+      accounts: accounts.map((a) => ({
+        igUserId: a.igUserId,
+        username: a.username,
+        pageName: a.pageName,
+        picture: a.picture,
+      })),
+    };
+  });
+
+/** Saves the Instagram profile chosen after the Meta login. */
+export const connectMetaAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { sessionId: string; igUserId: string }) => ({
+    sessionId: input.sessionId,
+    igUserId: input.igUserId,
+  }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: session } = await supabaseAdmin
+      .from("meta_oauth_sessions")
+      .select("id, client_id, access_token")
+      .eq("id", data.sessionId)
+      .maybeSingle();
+    if (!session) throw new Error("Conexão expirada. Conecte novamente.");
+
+    const { listIgAccounts } = await import("./meta.server");
+    const accounts = await listIgAccounts(session.access_token);
+    const chosen = accounts.find((a) => a.igUserId === data.igUserId);
+    if (!chosen) throw new Error("Perfil não encontrado nessa conta Meta.");
+
+    const { error } = await supabaseAdmin.from("instagram_accounts").upsert({
+      client_id: session.client_id,
+      ig_user_id: chosen.igUserId,
+      access_token: chosen.pageToken,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin
+      .from("clients")
+      .update({ ig_user_id: chosen.igUserId, ig_username: chosen.username || null })
+      .eq("id", session.client_id);
+
+    await supabaseAdmin.from("meta_oauth_sessions").delete().eq("id", session.id);
+
+    return { ok: true, username: chosen.username };
+  });
