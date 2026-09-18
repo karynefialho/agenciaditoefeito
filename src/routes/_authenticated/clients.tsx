@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   connectInstagram,
+  discoverInstagramAccounts,
   createClient,
   getMe,
   inviteClientUser,
@@ -141,6 +142,22 @@ function ClientCard({
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
 
+  const [options, setOptions] = useState<
+    { igUserId: string; username: string; pageName: string; picture: string }[]
+  >([]);
+
+  const discover = useMutation({
+    mutationFn: () => discoverInstagramAccounts({ data: { accessToken: token } }),
+    onSuccess: (list) => {
+      setOptions(list);
+      if (list.length === 1 && list[0]) {
+        setIgUserId(list[0].igUserId);
+        setIgUsername(list[0].username);
+      }
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
+  });
+
   const connect = useMutation({
     mutationFn: () =>
       connectInstagram({
@@ -148,6 +165,7 @@ function ClientCard({
       }),
     onSuccess: () => {
       setToken("");
+      setOptions([]);
       toast.success("Conta do Instagram conectada.");
       onChanged();
     },
@@ -208,34 +226,62 @@ function ClientCard({
           </p>
         </form>
 
-        <form
-          className="space-y-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            connect.mutate();
-          }}
-        >
-          <Label>Conta do Instagram</Label>
-          <Input
-            placeholder="ID da conta profissional"
-            value={igUserId}
-            onChange={(event) => setIgUserId(event.target.value)}
-          />
-          <Input
-            placeholder="@usuario (opcional)"
-            value={igUsername}
-            onChange={(event) => setIgUsername(event.target.value)}
-          />
+        <div className="space-y-2">
+          <Label>Conta do Instagram (via Meta Business)</Label>
           <Input
             type="password"
-            placeholder="Token de acesso"
+            placeholder="Token do Meta Business"
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />
-          <Button type="submit" variant="outline" disabled={connect.isPending || !igUserId || !token}>
-            Salvar conexão
+          <Button
+            type="button"
+            variant="outline"
+            disabled={discover.isPending || !token}
+            onClick={() => discover.mutate()}
+          >
+            {discover.isPending ? "Buscando perfis..." : "Buscar perfis"}
           </Button>
-        </form>
+
+          {options.length > 0 && (
+            <div className="space-y-2 rounded-lg border p-3">
+              {options.map((option) => (
+                <label key={option.igUserId} className="flex items-center gap-3 text-sm">
+                  <input
+                    type="radio"
+                    name={`ig-${client.id}`}
+                    checked={igUserId === option.igUserId}
+                    onChange={() => {
+                      setIgUserId(option.igUserId);
+                      setIgUsername(option.username);
+                    }}
+                  />
+                  {option.picture ? (
+                    <img src={option.picture} alt="" className="size-8 rounded-full object-cover" />
+                  ) : null}
+                  <span>
+                    @{option.username || option.igUserId}
+                    {option.pageName ? (
+                      <span className="text-muted-foreground"> · {option.pageName}</span>
+                    ) : null}
+                  </span>
+                </label>
+              ))}
+              <Button
+                type="button"
+                disabled={connect.isPending || !igUserId}
+                onClick={() => connect.mutate()}
+              >
+                Conectar perfil selecionado
+              </Button>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Cada cliente pode usar uma conta Meta Business diferente. Após conectar, os posts
+            aprovados são publicados sozinhos no horário marcado.
+          </p>
+        </div>
       </div>
     </div>
   );
