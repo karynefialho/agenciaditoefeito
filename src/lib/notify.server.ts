@@ -111,3 +111,21 @@ export async function sendApprovalReminders() {
   }
   return sent;
 }
+
+/** Welcomes a client right after their WhatsApp number is added. */
+export async function notifyWelcome(args: {
+  clientId: string;
+  clientName: string;
+  phone: string | null;
+}) {
+  if (!args.phone) return;
+  const body = `Olá, ${args.clientName}! 👋\n\nA partir de agora as aprovações de conteúdo acontecem aqui: ${APP_URL}\n\nVocê vai receber um aviso neste WhatsApp sempre que houver conteúdo novo para aprovar, um lembrete se a data do post estiver chegando e um aviso quando o post for publicado. É só acessar o link, ver a prévia e aprovar ou pedir alteração. 🚀`;
+
+  await sendWhatsApp({
+    phone: args.phone,
+    body,
+    kind: "welcome",
+    clientId: args.clientId,
+    postId: null,
+  });
+}
