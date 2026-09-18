@@ -141,6 +141,22 @@ function ClientCard({
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
 
+  const [options, setOptions] = useState<
+    { igUserId: string; username: string; pageName: string; picture: string }[]
+  >([]);
+
+  const discover = useMutation({
+    mutationFn: () => discoverInstagramAccounts({ data: { accessToken: token } }),
+    onSuccess: (list) => {
+      setOptions(list);
+      if (list.length === 1 && list[0]) {
+        setIgUserId(list[0].igUserId);
+        setIgUsername(list[0].username);
+      }
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
+  });
+
   const connect = useMutation({
     mutationFn: () =>
       connectInstagram({
@@ -148,6 +164,7 @@ function ClientCard({
       }),
     onSuccess: () => {
       setToken("");
+      setOptions([]);
       toast.success("Conta do Instagram conectada.");
       onChanged();
     },
