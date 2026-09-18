@@ -378,3 +378,60 @@ export const publishNow = createServerFn({ method: "POST" })
     await publishPostById(data.id);
     return { ok: true };
   });
+
+/** Lists the Instagram professional accounts reachable with a Meta Business token. */
+export const discoverInstagramAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { accessToken: string }) => ({
+    accessToken: input.accessToken.trim(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
+    if (!data.accessToken) throw new Error("Informe o token do Meta Business.");
+
+    const url = new URL("https://graph.facebook.com/v21.0/me/accounts");
+    url.searchParams.set(
+      "fields",
+      "name,instagram_business_account{id,username,profile_picture_url}",
+    );
+    url.searchParams.set("limit", "100");
+    url.searchParams.set("access_token", data.accessToken);
+
+    const response = await fetch(url);
+    const body = (await response.json()) as {
+      data?: Array<{
+        name?: string;
+        instagram_business_account?: {
+          id: string;
+          username?: string;
+          profile_picture_url?: string;
+        };
+      }>;
+      error?: { message?: string };
+    };
+    if (!response.ok || body.error) {
+      throw new Error(
+        body.error?.message ?? "Não foi possível ler as contas dessa conta Meta Business.",
+      );
+    }
+
+    const accounts = (body.data ?? [])
+      .filter((page) => page.instagram_business_account?.id)
+      .map((page) => ({
+        pageName: page.name ?? "",
+        igUserId: page.instagram_business_account!.id,
+        username: page.instagram_business_account!.username ?? "",
+        picture: page.instagram_business_account!.profile_picture_url ?? "",
+      }));
+
+    if (!accounts.length) {
+      throw new Error(
+        "Nenhum perfil profissional do Instagram encontrado nessa conta Meta Business. Verifique se o perfil está vinculado a uma Página do Facebook.",
+      );
+    }
+    return accounts;
+  });
