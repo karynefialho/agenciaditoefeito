@@ -241,14 +241,14 @@ function ClientCard({
         </form>
 
         <div className="space-y-2">
-          <Label>Conta do Instagram (via Meta Business)</Label>
+          <Label>Conta do Instagram</Label>
           <Button
             type="button"
             variant="outline"
             disabled={startConnect.isPending}
             onClick={() => startConnect.mutate()}
           >
-            {startConnect.isPending ? "Abrindo a Meta..." : "Conectar com Meta Business"}
+            {startConnect.isPending ? "Abrindo o Instagram..." : "Conectar com Instagram"}
           </Button>
 
           {options.length > 0 && (
@@ -286,8 +286,8 @@ function ClientCard({
           )}
 
           <p className="text-xs text-muted-foreground">
-            Cada cliente pode usar uma conta Meta Business diferente. Após conectar, os posts
-            aprovados são publicados sozinhos no horário marcado.
+            Cada cliente faz login com a própria conta do Instagram (profissional). Após conectar,
+            os posts aprovados são publicados sozinhos no horário marcado.
           </p>
         </div>
       </div>

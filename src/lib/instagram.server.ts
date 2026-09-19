@@ -1,4 +1,4 @@
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH = "https://graph.instagram.com/v23.0";
 
 type MediaItem = { url: string; media_type: string };
 

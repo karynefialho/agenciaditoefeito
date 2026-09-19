@@ -2,14 +2,11 @@ import { createHmac } from "crypto";
 
 import { APP_URL } from "./whatsapp.server";
 
-export const META_GRAPH = "https://graph.facebook.com/v21.0";
+export const META_GRAPH = "https://graph.instagram.com/v23.0";
 export const META_REDIRECT_URI = `${APP_URL}/api/public/meta/callback`;
 export const META_SCOPES = [
-  "pages_show_list",
-  "pages_read_engagement",
-  "business_management",
-  "instagram_basic",
-  "instagram_content_publish",
+  "instagram_business_basic",
+  "instagram_business_content_publish",
 ].join(",");
 
 function stateSecret() {
@@ -32,8 +29,8 @@ export function verifyState(state: string): string | null {
 
 export function metaAuthUrl(clientId: string) {
   const appId = process.env["META_APP_ID"];
-  if (!appId) throw new Error("A conexão com a Meta ainda não foi configurada.");
-  const url = new URL("https://www.facebook.com/v21.0/dialog/oauth");
+  if (!appId) throw new Error("A conexão com o Instagram ainda não foi configurada.");
+  const url = new URL("https://www.instagram.com/oauth/authorize");
   url.searchParams.set("client_id", appId);
   url.searchParams.set("redirect_uri", META_REDIRECT_URI);
   url.searchParams.set("state", signState(clientId));
@@ -42,39 +39,49 @@ export function metaAuthUrl(clientId: string) {
   return url.toString();
 }
 
-/** Exchanges the OAuth code for a long-lived user access token. */
+/** Exchanges the OAuth code for a long-lived Instagram access token. */
 export async function exchangeCodeForToken(code: string) {
   const appId = process.env["META_APP_ID"];
   const appSecret = process.env["META_APP_SECRET"];
-  if (!appId || !appSecret) throw new Error("Meta app não configurado.");
+  if (!appId || !appSecret) throw new Error("A conexão com o Instagram ainda não foi configurada.");
 
-  const shortUrl = new URL(`${META_GRAPH}/oauth/access_token`);
-  shortUrl.searchParams.set("client_id", appId);
-  shortUrl.searchParams.set("client_secret", appSecret);
-  shortUrl.searchParams.set("redirect_uri", META_REDIRECT_URI);
-  shortUrl.searchParams.set("code", code);
-
-  const shortRes = await fetch(shortUrl);
+  const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      grant_type: "authorization_code",
+      redirect_uri: META_REDIRECT_URI,
+      code,
+    }),
+  });
   const shortBody = (await shortRes.json()) as {
     access_token?: string;
-    error?: { message?: string };
+    error?: { message?: string; error_message?: string };
   };
   if (!shortRes.ok || !shortBody.access_token) {
-    throw new Error(shortBody.error?.message ?? "Falha ao autenticar com a Meta.");
+    throw new Error(
+      shortBody.error?.error_message ??
+        shortBody.error?.message ??
+        "Falha ao autenticar com o Instagram.",
+    );
   }
 
-  const longUrl = new URL(`${META_GRAPH}/oauth/access_token`);
-  longUrl.searchParams.set("grant_type", "fb_exchange_token");
-  longUrl.searchParams.set("client_id", appId);
+  const longUrl = new URL(`${META_GRAPH}/access_token`);
+  longUrl.searchParams.set("grant_type", "ig_exchange_token");
   longUrl.searchParams.set("client_secret", appSecret);
-  longUrl.searchParams.set("fb_exchange_token", shortBody.access_token);
+  longUrl.searchParams.set("access_token", shortBody.access_token);
 
   const longRes = await fetch(longUrl);
   const longBody = (await longRes.json()) as {
     access_token?: string;
     error?: { message?: string };
   };
-  return longBody.access_token ?? shortBody.access_token;
+  if (!longRes.ok || !longBody.access_token) {
+    throw new Error(longBody.error?.message ?? "Não foi possível guardar o acesso do Instagram.");
+  }
+  return longBody.access_token;
 }
 
 export type MetaIgAccount = {
@@ -85,36 +92,41 @@ export type MetaIgAccount = {
   pageToken: string;
 };
 
-/** Lists Instagram professional accounts reachable with a Meta user token. */
+/** Reads the Instagram professional account that logged in (one per login). */
 export async function listIgAccounts(userToken: string): Promise<MetaIgAccount[]> {
-  const url = new URL(`${META_GRAPH}/me/accounts`);
-  url.searchParams.set(
-    "fields",
-    "name,access_token,instagram_business_account{id,username,profile_picture_url}",
-  );
-  url.searchParams.set("limit", "100");
+  const url = new URL(`${META_GRAPH}/me`);
+  url.searchParams.set("fields", "user_id,username,account_type");
   url.searchParams.set("access_token", userToken);
 
   const res = await fetch(url);
   const body = (await res.json()) as {
-    data?: Array<{
-      name?: string;
-      access_token?: string;
-      instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
-    }>;
+    id?: string;
+    user_id?: string;
+    username?: string;
+    account_type?: string;
     error?: { message?: string };
   };
   if (!res.ok || body.error) {
-    throw new Error(body.error?.message ?? "Não foi possível ler as contas da Meta.");
+    throw new Error(body.error?.message ?? "Não foi possível ler a conta do Instagram.");
+  }
+  if (body.account_type && !["BUSINESS", "MEDIA_CREATOR"].includes(body.account_type)) {
+    throw new Error(
+      "Essa conta do Instagram não é profissional. No app do Instagram, ative o modo Conta profissional (Empresa ou Criador) e conecte novamente.",
+    );
   }
 
-  return (body.data ?? [])
-    .filter((page) => page.instagram_business_account?.id)
-    .map((page) => ({
-      igUserId: page.instagram_business_account!.id,
-      username: page.instagram_business_account!.username ?? "",
-      pageName: page.name ?? "",
-      picture: page.instagram_business_account!.profile_picture_url ?? "",
-      pageToken: page.access_token ?? userToken,
-    }));
+  const igUserId = String(body.user_id ?? body.id ?? "");
+  if (!igUserId) {
+    throw new Error("Nenhuma conta profissional do Instagram foi encontrada nesse login.");
+  }
+
+  return [
+    {
+      igUserId,
+      username: body.username ?? "",
+      pageName: "",
+      picture: "",
+      pageToken: userToken,
+    },
+  ];
 }
