@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_reports: {
+        Row: {
+          campaign_name: string
+          clicks: number
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          impressions: number
+          notes: string | null
+          period_end: string
+          period_start: string
+          reach: number
+          result_label: string
+          results: number
+          spend: number
+          updated_at: string
+        }
+        Insert: {
+          campaign_name: string
+          clicks?: number
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          impressions?: number
+          notes?: string | null
+          period_end: string
+          period_start: string
+          reach?: number
+          result_label?: string
+          results?: number
+          spend?: number
+          updated_at?: string
+        }
+        Update: {
+          campaign_name?: string
+          clicks?: number
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          impressions?: number
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          reach?: number
+          result_label?: string
+          results?: number
+          spend?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_members: {
         Row: {
           client_id: string

@@ -22,6 +22,13 @@
       "when": 1789691558466,
       "tag": "0002_create_meta_oauth_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790005113064,
+      "tag": "0003_create_ad_reports",
+      "breakpoints": true
     }
   ]
 }
