@@ -526,3 +526,87 @@ export const connectMetaAccount = createServerFn({ method: "POST" })
 
     return { ok: true, username: chosen.username };
   });
+
+/** Ad metrics reported by the agency for each client. */
+export const listAdReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("ad_reports")
+      .select(
+        "id, client_id, campaign_name, period_start, period_end, spend, reach, impressions, clicks, results, result_label, notes, clients(name)",
+      )
+      .order("period_start", { ascending: false })
+      .limit(120);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const saveAdReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      id?: string | undefined;
+      clientId: string;
+      campaignName: string;
+      periodStart: string;
+      periodEnd: string;
+      spend: number;
+      reach: number;
+      impressions: number;
+      clicks: number;
+      results: number;
+      resultLabel: string;
+      notes?: string | undefined;
+    }) => {
+      if (!input.clientId) throw new Error("Escolha um cliente.");
+      if (!input.campaignName.trim()) throw new Error("Dê um nome para a campanha.");
+      if (!input.periodStart || !input.periodEnd) throw new Error("Informe o período.");
+      return input;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode lançar métricas.");
+
+    const row = {
+      client_id: data.clientId,
+      campaign_name: data.campaignName.trim(),
+      period_start: data.periodStart,
+      period_end: data.periodEnd,
+      spend: data.spend,
+      reach: data.reach,
+      impressions: data.impressions,
+      clicks: data.clicks,
+      results: data.results,
+      result_label: data.resultLabel.trim() || "Resultados",
+      notes: data.notes?.trim() || null,
+      created_by: context.userId,
+    };
+
+    if (data.id) {
+      const { error } = await context.supabase.from("ad_reports").update(row).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+    const { error } = await context.supabase.from("ad_reports").insert(row);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteAdReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode remover métricas.");
+    const { error } = await context.supabase.from("ad_reports").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
