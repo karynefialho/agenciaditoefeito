@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarClock, CheckCircle2, Instagram } from "lucide-react";
+import { CheckCircle2, Eye, Instagram } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -7,17 +7,17 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Aprovô — aprovação de posts e publicação no Instagram" },
+      { title: "Área de aprovações — Dito Efeito" },
       {
         name: "description",
         content:
-          "Envie os posts para o cliente aprovar e publique automaticamente no Instagram na data e hora agendadas.",
+          "Espaço exclusivo dos clientes da Agência Dito Efeito para aprovar os conteúdos e acompanhar as publicações no Instagram.",
       },
-      { property: "og:title", content: "Aprovô — aprovação de posts para Instagram" },
+      { property: "og:title", content: "Área de aprovações — Dito Efeito" },
       {
         property: "og:description",
         content:
-          "Fluxo simples de aprovação de conteúdo com publicação automática no Instagram no horário agendado.",
+          "Espaço exclusivo dos clientes da Agência Dito Efeito para aprovar conteúdos e acompanhar publicações.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -38,38 +38,41 @@ function Index() {
 
       <main className="mx-auto max-w-5xl px-6 pb-24 pt-10">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">
-          Para agências e social media
+          Exclusivo para clientes da Dito Efeito
         </p>
         <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-          Seu cliente aprova. O post vai pro Instagram sozinho, na hora certa.
+          Seu espaço para aprovar os conteúdos da sua marca.
         </h1>
         <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-          Monte o conteúdo, agende a data e hora e envie para aprovação. Assim que o cliente
-          aprovar, a publicação acontece automaticamente no horário combinado.
+          Aqui você vê tudo o que a Dito Efeito preparou para o seu Instagram, aprova ou pede
+          ajustes. Depois da sua aprovação, o post é publicado sozinho na data e hora combinadas.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-wrap items-center gap-4">
           <Button asChild size="lg">
-            <Link to="/auth">Começar agora</Link>
+            <Link to="/auth">Entrar na minha área</Link>
           </Button>
+          <span className="text-sm text-muted-foreground">
+            O acesso é criado pela agência. Ainda não recebeu o seu? Fale com a gente.
+          </span>
         </div>
 
         <div className="mt-20 grid gap-6 sm:grid-cols-3">
           {[
             {
-              icon: CalendarClock,
-              title: "Agende antes",
-              text: "Defina data e hora de cada post, carrossel, reel ou story.",
+              icon: Eye,
+              title: "Veja o conteúdo",
+              text: "Fotos, carrosséis, reels e stories com legenda e data já definidas.",
             },
             {
               icon: CheckCircle2,
-              title: "Cliente aprova",
-              text: "Cada cliente entra com o próprio login e aprova ou pede ajuste.",
+              title: "Aprove ou peça ajuste",
+              text: "Um toque para aprovar. Se preferir mudar algo, é só escrever o que deseja.",
             },
             {
               icon: Instagram,
-              title: "Publica sozinho",
-              text: "No horário agendado, o conteúdo aprovado vai direto pro Instagram.",
+              title: "A gente publica",
+              text: "No horário marcado, o conteúdo aprovado vai direto para o seu Instagram.",
             },
           ].map((item) => (
             <div key={item.title} className="rounded-xl border bg-card p-6">
