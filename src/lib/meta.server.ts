@@ -36,6 +36,8 @@ export function metaAuthUrl(clientId: string) {
   url.searchParams.set("state", signState(clientId));
   url.searchParams.set("scope", META_SCOPES);
   url.searchParams.set("response_type", "code");
+  url.searchParams.set("enable_fb_login", "0");
+  url.searchParams.set("force_authentication", "1");
   return url.toString();
 }
 
