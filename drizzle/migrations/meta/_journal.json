@@ -29,6 +29,13 @@
       "when": 1790005113064,
       "tag": "0003_create_ad_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790114663076,
+      "tag": "0004_restrict_post_media_policies",
+      "breakpoints": true
     }
   ]
 }
