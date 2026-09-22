@@ -98,8 +98,8 @@ function PrivacyPage() {
           <p className="text-muted-foreground">
             Para solicitar a exclusão dos seus dados ou a desconexão da conta do Instagram, escreva
             para{" "}
-            <a className="underline" href="mailto:contato@ditoefeito.com.br">
-              contato@ditoefeito.com.br
+            <a className="underline" href="mailto:agenciaditoefeito@gmail.com">
+              agenciaditoefeito@gmail.com
             </a>
             . Atendemos em até 30 dias.
           </p>
@@ -109,8 +109,8 @@ function PrivacyPage() {
           <h2 className="text-xl font-medium">Contato</h2>
           <p className="text-muted-foreground">
             Dúvidas sobre esta política: {""}
-            <a className="underline" href="mailto:contato@ditoefeito.com.br">
-              contato@ditoefeito.com.br
+            <a className="underline" href="mailto:agenciaditoefeito@gmail.com">
+              agenciaditoefeito@gmail.com
             </a>
             .
           </p>
