@@ -46,6 +46,8 @@ export async function exchangeCodeForToken(code: string) {
   const appSecret = process.env["META_APP_SECRET"];
   if (!appId || !appSecret) throw new Error("A conexão com o Instagram ainda não foi configurada.");
 
+  const cleanCode = code.replace(/#_$/, "");
+
   const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -54,22 +56,25 @@ export async function exchangeCodeForToken(code: string) {
       client_secret: appSecret,
       grant_type: "authorization_code",
       redirect_uri: META_REDIRECT_URI,
-      code,
+      code: cleanCode,
     }),
   });
   const shortBody = (await shortRes.json()) as {
     access_token?: string;
     error?: { message?: string; error_message?: string };
+    error_message?: string;
   };
   if (!shortRes.ok || !shortBody.access_token) {
     throw new Error(
       shortBody.error?.error_message ??
+        shortBody.error_message ??
         shortBody.error?.message ??
         "Falha ao autenticar com o Instagram.",
     );
   }
 
-  const longUrl = new URL(`${META_GRAPH}/access_token`);
+  // Long-lived token endpoint is unversioned on graph.instagram.com
+  const longUrl = new URL("https://graph.instagram.com/access_token");
   longUrl.searchParams.set("grant_type", "ig_exchange_token");
   longUrl.searchParams.set("client_secret", appSecret);
   longUrl.searchParams.set("access_token", shortBody.access_token);
