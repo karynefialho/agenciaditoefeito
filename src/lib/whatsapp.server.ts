@@ -1,6 +1,6 @@
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/whatsapp";
 
-export const APP_URL = "https://project--66a8bc3a-2516-4787-aa9e-7e09284f5858.lovable.app";
+export const APP_URL = "https://agenciaditoefeito.lovable.app";
 
 function onlyDigits(phone: string) {
   return phone.replace(/\D/g, "");
