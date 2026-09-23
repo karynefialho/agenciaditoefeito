@@ -1,9 +1,8 @@
 import { createHmac } from "crypto";
 
-import { APP_URL } from "./whatsapp.server";
-
 export const META_GRAPH = "https://graph.instagram.com/v23.0";
-export const META_REDIRECT_URI = `${APP_URL}/api/public/meta/callback`;
+export const META_REDIRECT_URI =
+  "https://project--66a8bc3a-2516-4787-aa9e-7e09284f5858.lovable.app/api/public/meta/callback";
 export const META_SCOPES = [
   "instagram_business_basic",
   "instagram_business_content_publish",
