@@ -85,7 +85,8 @@ export async function exchangeCodeForToken(code: string) {
     error?: { message?: string };
   };
   if (!longRes.ok || !longBody.access_token) {
-    throw new Error(longBody.error?.message ?? "Não foi possível guardar o acesso do Instagram.");
+    // Fall back to the short-lived token so the connection still works.
+    return shortBody.access_token;
   }
   return longBody.access_token;
 }
