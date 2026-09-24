@@ -13,6 +13,7 @@ import {
   getMe,
   inviteClientUser,
   listClients,
+  listClientMembers,
   updateClientWhatsapp,
   resendWelcomeWhatsapp,
 } from "@/lib/app.functions";
@@ -196,11 +197,20 @@ function ClientCard({
 }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState(client.whatsapp_phone ?? "");
+  const [addingEmail, setAddingEmail] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(!client.whatsapp_phone);
+  const members = useQuery({
+    queryKey: ["client-members", client.id],
+    queryFn: () => listClientMembers({ data: { clientId: client.id } }),
+  });
+  const memberList = members.data ?? [];
+  const showEmailForm = addingEmail || (members.isSuccess && memberList.length === 0);
 
   const saveWhatsapp = useMutation({
     mutationFn: () => updateClientWhatsapp({ data: { clientId: client.id, whatsapp: phone } }),
     onSuccess: () => {
       toast.success("WhatsApp salvo.");
+      setEditingPhone(false);
       onChanged();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
@@ -216,7 +226,9 @@ function ClientCard({
     mutationFn: () => inviteClientUser({ data: { clientId: client.id, email } }),
     onSuccess: () => {
       setEmail("");
-      toast.success("Pessoa vinculada ao cliente. Se for novo, receberá um convite por e-mail.");
+      setAddingEmail(false);
+      members.refetch();
+      toast.success("Convite enviado para o e-mail do cliente.");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
@@ -239,45 +251,84 @@ function ClientCard({
       </div>
 
       <div className="mt-5 grid gap-6 md:grid-cols-2">
-        <form
-          className="space-y-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            invite.mutate();
-          }}
-        >
-          <Label>Convidar quem aprova</Label>
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              placeholder="email@cliente.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-            <Button type="submit" variant="outline" disabled={invite.isPending || !email}>
-              Convidar
-            </Button>
-          </div>
-        </form>
+        <div className="space-y-2">
+          <Label>Quem aprova</Label>
+          {memberList.length > 0 && (
+            <ul className="space-y-1">
+              {memberList.map((m) => (
+                <li
+                  key={m.id}
+                  className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm"
+                >
+                  <span className="text-primary">✓</span>
+                  <span className="truncate">{m.email}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Convite enviado</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {showEmailForm ? (
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                invite.mutate();
+              }}
+            >
+              <Input
+                type="email"
+                placeholder="email@cliente.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <Button type="submit" variant="outline" disabled={invite.isPending || !email}>
+                {invite.isPending ? "Enviando..." : "Convidar"}
+              </Button>
+            </form>
+          ) : (
+            memberList.length > 0 && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setAddingEmail(true)}>
+                + Convidar outra pessoa
+              </Button>
+            )
+          )}
+        </div>
 
-        <form
-          className="space-y-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveWhatsapp.mutate();
-          }}
-        >
+        <div className="space-y-2">
           <Label>WhatsApp do cliente</Label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="55 11 99999-9999"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-            <Button type="submit" variant="outline" disabled={saveWhatsapp.isPending}>
-              Salvar
-            </Button>
-          </div>
+          {editingPhone ? (
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveWhatsapp.mutate();
+              }}
+            >
+              <Input
+                placeholder="55 11 99999-9999"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+              />
+              <Button type="submit" variant="outline" disabled={saveWhatsapp.isPending || !phone.trim()}>
+                Salvar
+              </Button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-primary">✓</span>
+              <span className="truncate">{client.whatsapp_phone}</span>
+              <span className="text-xs text-muted-foreground">Contato salvo</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-7"
+                onClick={() => setEditingPhone(true)}
+              >
+                Alterar
+              </Button>
+            </div>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -290,7 +341,7 @@ function ClientCard({
           <p className="text-xs text-muted-foreground">
             Usado para avisar sobre conteúdo novo, lembrete de aprovação e publicação.
           </p>
-        </form>
+        </div>
 
         <div className="space-y-2">
           <Label>Conta do Instagram</Label>
