@@ -123,7 +123,20 @@ function NewPost() {
             onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
           />
           {files.length > 0 && (
-            <p className="text-xs text-muted-foreground">{files.length} arquivo(s) selecionado(s)</p>
+            <MediaPreview
+              files={files}
+              kind={kind}
+              onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+              onMove={(i, dir) =>
+                setFiles((prev) => {
+                  const next = [...prev];
+                  const j = i + dir;
+                  if (j < 0 || j >= next.length) return prev;
+                  [next[i], next[j]] = [next[j]!, next[i]!];
+                  return next;
+                })
+              }
+            />
           )}
         </div>
 
