@@ -94,6 +94,41 @@ export const updateClientWhatsapp = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const resendWelcomeWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { clientId: string }) => ({ clientId: input.clientId }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode enviar mensagens.");
+    const { data: client } = await context.supabase
+      .from("clients")
+      .select("name, whatsapp_phone")
+      .eq("id", data.clientId)
+      .maybeSingle();
+    if (!client?.whatsapp_phone) throw new Error("Cadastre o WhatsApp do cliente primeiro.");
+    const { sendWhatsApp, APP_URL } = await import("./whatsapp.server");
+    const body = `Olá, ${client.name}! 👋\n\nA partir de agora as aprovações de conteúdo da Dito Efeito acontecem aqui: ${APP_URL}\n\nVocê vai receber um aviso neste WhatsApp sempre que houver conteúdo novo para aprovar, um lembrete se a data do post estiver chegando e um aviso quando o post for publicado. É só acessar o link, ver a prévia e aprovar ou pedir alteração. 🚀`;
+    const result = await sendWhatsApp({
+      phone: client.whatsapp_phone,
+      body,
+      kind: "welcome",
+      clientId: data.clientId,
+    });
+    if (!result.sent) {
+      const reason =
+        result.reason === "not-configured"
+          ? "O WhatsApp da agência não está conectado."
+          : result.reason === "no-phone"
+            ? "Cliente sem número de WhatsApp."
+            : `O WhatsApp recusou a mensagem: ${"error" in result ? result.error : ""}`;
+      throw new Error(reason);
+    }
+    return { ok: true };
+  });
+
 export const listFeed = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
