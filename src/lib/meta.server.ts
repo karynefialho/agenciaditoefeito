@@ -1,6 +1,8 @@
 import { createHmac } from "crypto";
 
 export const META_GRAPH = "https://graph.instagram.com/v22.0";
+export const META_REDIRECT_URI =
+  "https://agenciaditoefeito.lovable.app/api/public/meta/callback";
 export const META_SCOPES = [
   "instagram_business_basic",
   "instagram_business_content_publish",
@@ -24,17 +26,12 @@ export function verifyState(state: string): string | null {
   return mac === expected ? clientId : null;
 }
 
-export function metaAuthUrl(clientId: string, origin?: string) {
+export function metaAuthUrl(clientId: string) {
   const appId = process.env["META_APP_ID"];
   if (!appId) throw new Error("A conexão com o Instagram ainda não foi configurada.");
-  
-  const redirectUri = origin 
-    ? `${origin}/api/public/meta/callback` 
-    : "https://agenciaditoefeito.lovable.app/api/public/meta/callback";
-
   const url = new URL("https://www.instagram.com/oauth/authorize");
   url.searchParams.set("client_id", appId);
-  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("redirect_uri", META_REDIRECT_URI);
   url.searchParams.set("state", signState(clientId));
   url.searchParams.set("scope", META_SCOPES);
   url.searchParams.set("response_type", "code");
@@ -44,14 +41,10 @@ export function metaAuthUrl(clientId: string, origin?: string) {
 }
 
 /** Exchanges the OAuth code for a long-lived Instagram access token. */
-export async function exchangeCodeForToken(code: string, origin?: string) {
+export async function exchangeCodeForToken(code: string) {
   const appId = process.env["META_APP_ID"];
   const appSecret = process.env["META_APP_SECRET"];
   if (!appId || !appSecret) throw new Error("A conexão com o Instagram ainda não foi configurada.");
-
-  const redirectUri = origin 
-    ? `${origin}/api/public/meta/callback` 
-    : "https://agenciaditoefeito.lovable.app/api/public/meta/callback";
 
   const cleanCode = code.replace(/#_$/, "");
 
@@ -62,7 +55,7 @@ export async function exchangeCodeForToken(code: string, origin?: string) {
       client_id: appId,
       client_secret: appSecret,
       grant_type: "authorization_code",
-      redirect_uri: redirectUri,
+      redirect_uri: META_REDIRECT_URI,
       code: cleanCode,
     }),
   });
