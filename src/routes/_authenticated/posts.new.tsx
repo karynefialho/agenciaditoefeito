@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
+import { MediaPreview } from "@/components/media-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,7 +124,20 @@ function NewPost() {
             onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
           />
           {files.length > 0 && (
-            <p className="text-xs text-muted-foreground">{files.length} arquivo(s) selecionado(s)</p>
+            <MediaPreview
+              files={files}
+              kind={kind}
+              onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+              onMove={(i, dir) =>
+                setFiles((prev) => {
+                  const next = [...prev];
+                  const j = i + dir;
+                  if (j < 0 || j >= next.length) return prev;
+                  [next[i], next[j]] = [next[j]!, next[i]!];
+                  return next;
+                })
+              }
+            />
           )}
         </div>
 
