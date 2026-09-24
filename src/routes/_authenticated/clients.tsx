@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  connectMetaAccount,
-  listMetaSessionAccounts,
   startMetaConnect,
   createClient,
   getMe,
@@ -44,6 +42,24 @@ function ClientsPage() {
   const clients = useQuery({ queryKey: ["clients"], queryFn: () => listClients() });
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("meta_error");
+    const connected = params.get("meta_connected");
+
+    if (error) toast.error(error);
+    if (connected !== null) {
+      toast.success(
+        connected ? `Instagram @${connected} conectado.` : "Conta do Instagram conectada.",
+      );
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    }
+
+    if (error || connected !== null || params.has("meta_session")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [queryClient]);
 
   const addClient = useMutation({
     mutationFn: () => createClient({ data: { name, whatsapp } }),
@@ -120,8 +136,6 @@ function ClientCard({
   onChanged: () => void;
 }) {
   const [email, setEmail] = useState("");
-  const [igUserId, setIgUserId] = useState(client.ig_user_id ?? "");
-  const [igUsername, setIgUsername] = useState(client.ig_username ?? "");
   const [phone, setPhone] = useState(client.whatsapp_phone ?? "");
 
   const saveWhatsapp = useMutation({
@@ -142,46 +156,10 @@ function ClientCard({
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
 
-  const [options, setOptions] = useState<
-    { igUserId: string; username: string; pageName: string; picture: string }[]
-  >([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get("meta_error");
-    if (error) toast.error(error);
-    const session = params.get("meta_session");
-    if (!session) return;
-    listMetaSessionAccounts({ data: { sessionId: session } })
-      .then((result) => {
-        if (result.clientId !== client.id) return;
-        setSessionId(session);
-        setOptions(result.accounts);
-        if (result.accounts.length === 1 && result.accounts[0]) {
-          setIgUserId(result.accounts[0].igUserId);
-          setIgUsername(result.accounts[0].username);
-        }
-      })
-      .catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const startConnect = useMutation({
     mutationFn: () => startMetaConnect({ data: { clientId: client.id } }),
     onSuccess: (result) => {
       window.location.href = result.url;
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
-  });
-
-  const connect = useMutation({
-    mutationFn: () => connectMetaAccount({ data: { sessionId: sessionId ?? "", igUserId } }),
-    onSuccess: () => {
-      setOptions([]);
-      setSessionId(null);
-      toast.success("Conta do Instagram conectada.");
-      onChanged();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
@@ -250,40 +228,6 @@ function ClientCard({
           >
             {startConnect.isPending ? "Abrindo o Instagram..." : "Conectar com Instagram"}
           </Button>
-
-          {options.length > 0 && (
-            <div className="space-y-2 rounded-lg border p-3">
-              {options.map((option) => (
-                <label key={option.igUserId} className="flex items-center gap-3 text-sm">
-                  <input
-                    type="radio"
-                    name={`ig-${client.id}`}
-                    checked={igUserId === option.igUserId}
-                    onChange={() => {
-                      setIgUserId(option.igUserId);
-                      setIgUsername(option.username);
-                    }}
-                  />
-                  {option.picture ? (
-                    <img src={option.picture} alt="" className="size-8 rounded-full object-cover" />
-                  ) : null}
-                  <span>
-                    @{option.username || option.igUserId}
-                    {option.pageName ? (
-                      <span className="text-muted-foreground"> · {option.pageName}</span>
-                    ) : null}
-                  </span>
-                </label>
-              ))}
-              <Button
-                type="button"
-                disabled={connect.isPending || !igUserId || !sessionId}
-                onClick={() => connect.mutate()}
-              >
-                Conectar perfil selecionado
-              </Button>
-            </div>
-          )}
 
           <p className="text-xs text-muted-foreground">
             Cada cliente faz login com a própria conta do Instagram (profissional). Após conectar,
