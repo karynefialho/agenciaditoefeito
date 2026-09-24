@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/public/meta/callback")({
           if (clientError) return fail("Não foi possível vincular o Instagram ao cliente.");
 
           return Response.redirect(
-            `${origin}/clients?meta_connected=${encodeURIComponent(account.username)}`,
+            `${origin}/clients?meta_connected=${encodeURIComponent(account.username || "")}`,
             302,
           );
         } catch (e) {
