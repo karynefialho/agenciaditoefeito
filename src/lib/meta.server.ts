@@ -61,6 +61,7 @@ export async function exchangeCodeForToken(code: string) {
   });
   const shortBody = (await shortRes.json()) as {
     access_token?: string;
+    user_id?: string | number;
     error?: { message?: string; error_message?: string };
     error_message?: string;
   };
@@ -72,22 +73,22 @@ export async function exchangeCodeForToken(code: string) {
         "Falha ao autenticar com o Instagram.",
     );
   }
+  const userId = shortBody.user_id != null ? String(shortBody.user_id) : "";
 
-  // Long-lived token endpoint is unversioned on graph.instagram.com
-  const longUrl = new URL("https://graph.instagram.com/access_token");
-  longUrl.searchParams.set("grant_type", "ig_exchange_token");
-  longUrl.searchParams.set("client_secret", appSecret);
-  longUrl.searchParams.set("access_token", shortBody.access_token);
-
-  const longRes = await fetch(longUrl);
-  const longBody = (await longRes.json()) as {
-    access_token?: string;
-    error?: { message?: string };
-  };
-  if (!longRes.ok || !longBody.access_token) {
-    return shortBody.access_token;
+  try {
+    const longUrl = new URL("https://graph.instagram.com/access_token");
+    longUrl.searchParams.set("grant_type", "ig_exchange_token");
+    longUrl.searchParams.set("client_secret", appSecret);
+    longUrl.searchParams.set("access_token", shortBody.access_token);
+    const longRes = await fetch(longUrl);
+    const longBody = (await longRes.json()) as { access_token?: string };
+    if (longRes.ok && longBody.access_token) {
+      return { token: longBody.access_token, userId };
+    }
+  } catch {
+    // fall back to short-lived token
   }
-  return longBody.access_token;
+  return { token: shortBody.access_token, userId };
 }
 
 export type MetaIgAccount = {
@@ -99,39 +100,43 @@ export type MetaIgAccount = {
 };
 
 /** Reads the Instagram professional account that logged in (one per login). */
-export async function listIgAccounts(userToken: string): Promise<MetaIgAccount[]> {
-  const url = new URL(`${META_GRAPH}/me`);
-  url.searchParams.set("fields", "id,username,account_type");
-  url.searchParams.set("access_token", userToken);
+export async function listIgAccounts(
+  userToken: string,
+  fallbackUserId = "",
+): Promise<MetaIgAccount[]> {
+  let igUserId = fallbackUserId;
+  let username = "";
 
-  const res = await fetch(url);
-  const body = (await res.json()) as {
-    id?: string;
-    username?: string;
-    account_type?: string;
-    error?: { message?: string };
-  };
-  if (!res.ok || body.error) {
-    throw new Error(body.error?.message ?? "Não foi possível ler a conta do Instagram.");
-  }
-  if (body.account_type && !["BUSINESS", "MEDIA_CREATOR"].includes(body.account_type)) {
-    throw new Error(
-      "Essa conta do Instagram não é profissional. No app do Instagram, ative o modo Conta profissional (Empresa ou Criador) e conecte novamente.",
-    );
+  for (const base of ["https://graph.instagram.com", META_GRAPH]) {
+    try {
+      const url = new URL(`${base}/me`);
+      url.searchParams.set("fields", "user_id,username,account_type");
+      url.searchParams.set("access_token", userToken);
+      const res = await fetch(url);
+      const body = (await res.json()) as {
+        id?: string;
+        user_id?: string | number;
+        username?: string;
+        account_type?: string;
+        error?: { message?: string };
+      };
+      if (!res.ok || body.error) continue;
+      if (body.account_type && !["BUSINESS", "MEDIA_CREATOR"].includes(body.account_type)) {
+        throw new Error(
+          "Essa conta do Instagram não é profissional. No app do Instagram, ative o modo Conta profissional (Empresa ou Criador) e conecte novamente.",
+        );
+      }
+      igUserId = String(body.user_id ?? body.id ?? igUserId);
+      username = body.username ?? "";
+      break;
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("não é profissional")) throw e;
+    }
   }
 
-  const igUserId = String(body.id ?? "");
   if (!igUserId) {
     throw new Error("Nenhuma conta profissional do Instagram foi encontrada nesse login.");
   }
 
-  return [
-    {
-      igUserId,
-      username: body.username ?? "",
-      pageName: "",
-      picture: "",
-      pageToken: userToken,
-    },
-  ];
+  return [{ igUserId, username, pageName: "", picture: "", pageToken: userToken }];
 }
