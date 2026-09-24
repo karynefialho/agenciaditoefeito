@@ -107,6 +107,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          ig_picture_url: string | null
           ig_user_id: string | null
           ig_username: string | null
           name: string
@@ -116,6 +117,7 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          ig_picture_url?: string | null
           ig_user_id?: string | null
           ig_username?: string | null
           name: string
@@ -125,6 +127,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          ig_picture_url?: string | null
           ig_user_id?: string | null
           ig_username?: string | null
           name?: string
