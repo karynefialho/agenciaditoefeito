@@ -14,6 +14,7 @@ import {
   inviteClientUser,
   listClients,
   updateClientWhatsapp,
+  resendWelcomeWhatsapp,
 } from "@/lib/app.functions";
 
 export const Route = createFileRoute("/_authenticated/clients")({
@@ -147,6 +148,12 @@ function ClientCard({
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
   });
 
+  const resend = useMutation({
+    mutationFn: () => resendWelcomeWhatsapp({ data: { clientId: client.id } }),
+    onSuccess: () => toast.success("Mensagem de boas-vindas enviada."),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
+  });
+
   const invite = useMutation({
     mutationFn: () => inviteClientUser({ data: { clientId: client.id, email } }),
     onSuccess: () => {
@@ -213,6 +220,15 @@ function ClientCard({
               Salvar
             </Button>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={resend.isPending || !client.whatsapp_phone}
+            onClick={() => resend.mutate()}
+          >
+            {resend.isPending ? "Enviando..." : "Enviar mensagem de boas-vindas"}
+          </Button>
           <p className="text-xs text-muted-foreground">
             Usado para avisar sobre conteúdo novo, lembrete de aprovação e publicação.
           </p>
