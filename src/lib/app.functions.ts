@@ -26,7 +26,7 @@ export const listClients = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("clients")
-      .select("id, name, ig_username, ig_user_id, whatsapp_phone, created_at")
+      .select("id, name, ig_username, ig_user_id, ig_picture_url, whatsapp_phone, created_at")
       .order("name");
     if (error) throw new Error(error.message);
     return data ?? [];

@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/public/meta/callback")({
 
           const { error: clientError } = await supabaseAdmin
             .from("clients")
-            .update({ ig_user_id: account.igUserId, ig_username: account.username || null })
+            .update({ ig_user_id: account.igUserId, ig_username: account.username || null, ig_picture_url: account.picture || null })
             .eq("id", clientId);
           if (clientError) return fail("Não foi possível vincular o Instagram ao cliente.");
 
