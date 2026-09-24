@@ -1,8 +1,6 @@
 import { createHmac } from "crypto";
 
-export const META_GRAPH = "https://graph.instagram.com/v23.0";
-export const META_REDIRECT_URI =
-  "https://project--66a8bc3a-2516-4787-aa9e-7e09284f5858.lovable.app/api/public/meta/callback";
+export const META_GRAPH = "https://graph.instagram.com/v22.0";
 export const META_SCOPES = [
   "instagram_business_basic",
   "instagram_business_content_publish",
@@ -26,12 +24,17 @@ export function verifyState(state: string): string | null {
   return mac === expected ? clientId : null;
 }
 
-export function metaAuthUrl(clientId: string) {
+export function metaAuthUrl(clientId: string, origin?: string) {
   const appId = process.env["META_APP_ID"];
   if (!appId) throw new Error("A conexão com o Instagram ainda não foi configurada.");
+  
+  const redirectUri = origin 
+    ? `${origin}/api/public/meta/callback` 
+    : "https://agenciaditoefeito.lovable.app/api/public/meta/callback";
+
   const url = new URL("https://www.instagram.com/oauth/authorize");
   url.searchParams.set("client_id", appId);
-  url.searchParams.set("redirect_uri", META_REDIRECT_URI);
+  url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("state", signState(clientId));
   url.searchParams.set("scope", META_SCOPES);
   url.searchParams.set("response_type", "code");
@@ -41,10 +44,14 @@ export function metaAuthUrl(clientId: string) {
 }
 
 /** Exchanges the OAuth code for a long-lived Instagram access token. */
-export async function exchangeCodeForToken(code: string) {
+export async function exchangeCodeForToken(code: string, origin?: string) {
   const appId = process.env["META_APP_ID"];
   const appSecret = process.env["META_APP_SECRET"];
   if (!appId || !appSecret) throw new Error("A conexão com o Instagram ainda não foi configurada.");
+
+  const redirectUri = origin 
+    ? `${origin}/api/public/meta/callback` 
+    : "https://agenciaditoefeito.lovable.app/api/public/meta/callback";
 
   const cleanCode = code.replace(/#_$/, "");
 
@@ -55,7 +62,7 @@ export async function exchangeCodeForToken(code: string) {
       client_id: appId,
       client_secret: appSecret,
       grant_type: "authorization_code",
-      redirect_uri: META_REDIRECT_URI,
+      redirect_uri: redirectUri,
       code: cleanCode,
     }),
   });
@@ -85,7 +92,6 @@ export async function exchangeCodeForToken(code: string) {
     error?: { message?: string };
   };
   if (!longRes.ok || !longBody.access_token) {
-    // Fall back to the short-lived token so the connection still works.
     return shortBody.access_token;
   }
   return longBody.access_token;
@@ -102,13 +108,12 @@ export type MetaIgAccount = {
 /** Reads the Instagram professional account that logged in (one per login). */
 export async function listIgAccounts(userToken: string): Promise<MetaIgAccount[]> {
   const url = new URL(`${META_GRAPH}/me`);
-  url.searchParams.set("fields", "user_id,username,account_type");
+  url.searchParams.set("fields", "id,username,account_type");
   url.searchParams.set("access_token", userToken);
 
   const res = await fetch(url);
   const body = (await res.json()) as {
     id?: string;
-    user_id?: string;
     username?: string;
     account_type?: string;
     error?: { message?: string };
@@ -122,7 +127,7 @@ export async function listIgAccounts(userToken: string): Promise<MetaIgAccount[]
     );
   }
 
-  const igUserId = String(body.user_id ?? body.id ?? "");
+  const igUserId = String(body.id ?? "");
   if (!igUserId) {
     throw new Error("Nenhuma conta profissional do Instagram foi encontrada nesse login.");
   }

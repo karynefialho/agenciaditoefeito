@@ -447,7 +447,7 @@ export const startMetaConnect = createServerFn({ method: "POST" })
     });
     if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
     const { metaAuthUrl } = await import("./meta.server");
-    return { url: metaAuthUrl(data.clientId) };
+    return { url: metaAuthUrl(data.clientId, context.request.headers.get("origin") || undefined) };
   });
 
 /** Lists the Instagram profiles available after the Meta login. */
