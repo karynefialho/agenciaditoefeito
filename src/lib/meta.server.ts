@@ -106,11 +106,12 @@ export async function listIgAccounts(
 ): Promise<MetaIgAccount[]> {
   let igUserId = fallbackUserId;
   let username = "";
+  let picture = "";
 
   for (const base of ["https://graph.instagram.com", META_GRAPH]) {
     try {
       const url = new URL(`${base}/me`);
-      url.searchParams.set("fields", "user_id,username,account_type");
+      url.searchParams.set("fields", "user_id,username,account_type,profile_picture_url");
       url.searchParams.set("access_token", userToken);
       const res = await fetch(url);
       const body = (await res.json()) as {
@@ -118,6 +119,7 @@ export async function listIgAccounts(
         user_id?: string | number;
         username?: string;
         account_type?: string;
+        profile_picture_url?: string;
         error?: { message?: string };
       };
       if (!res.ok || body.error) continue;
@@ -128,6 +130,7 @@ export async function listIgAccounts(
       }
       igUserId = String(body.user_id ?? body.id ?? igUserId);
       username = body.username ?? "";
+      picture = body.profile_picture_url ?? "";
       break;
     } catch (e) {
       if (e instanceof Error && e.message.includes("não é profissional")) throw e;
@@ -138,5 +141,5 @@ export async function listIgAccounts(
     throw new Error("Nenhuma conta profissional do Instagram foi encontrada nesse login.");
   }
 
-  return [{ igUserId, username, pageName: "", picture: "", pageToken: userToken }];
+  return [{ igUserId, username, pageName: "", picture, pageToken: userToken }];
 }

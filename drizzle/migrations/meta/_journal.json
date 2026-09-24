@@ -36,6 +36,13 @@
       "when": 1790114663076,
       "tag": "0004_restrict_post_media_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790266959437,
+      "tag": "0005_add_client_picture",
+      "breakpoints": true
     }
   ]
 }
