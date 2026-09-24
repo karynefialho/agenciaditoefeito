@@ -21,10 +21,10 @@ export const Route = createFileRoute("/api/public/meta/callback")({
         if (!clientId) return fail("Link de conexão inválido.");
 
         try {
-          const token = await exchangeCodeForToken(code);
+          const { token, userId } = await exchangeCodeForToken(code);
           if (!token) return fail("Não foi possível obter o acesso da Meta.");
 
-          const accounts = await listIgAccounts(token);
+          const accounts = await listIgAccounts(token, userId);
           const account = accounts[0];
           if (!account) return fail("Nenhuma conta profissional do Instagram foi encontrada.");
 
@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/public/meta/callback")({
           if (clientError) return fail("Não foi possível vincular o Instagram ao cliente.");
 
           return Response.redirect(
-            `${origin}/clients?meta_connected=${encodeURIComponent(account.username)}`,
+            `${origin}/clients?meta_connected=${encodeURIComponent(account.username || "")}`,
             302,
           );
         } catch (e) {
