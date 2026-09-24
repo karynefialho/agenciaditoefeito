@@ -43,6 +43,7 @@ function ClientsPage() {
   const clients = useQuery({ queryKey: ["clients"], queryFn: () => listClients() });
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -81,6 +82,8 @@ function ClientsPage() {
     );
   }
 
+  const selected = clients.data?.find((c) => c.id === selectedId) ?? null;
+
   return (
     <AppShell isAdmin={me.data?.isAdmin} email={me.data?.email}>
       <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
@@ -110,16 +113,70 @@ function ClientsPage() {
         </Button>
       </form>
 
-      <div className="mt-8 space-y-4">
-        {clients.data?.map((client) => (
+      {selected ? (
+        <div className="mt-8 space-y-4">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedId(null)}>
+            ← Voltar para todos os clientes
+          </Button>
           <ClientCard
-            key={client.id}
-            client={client}
+            key={selected.id}
+            client={selected}
             onChanged={() => queryClient.invalidateQueries({ queryKey: ["clients"] })}
           />
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="mt-8">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            {clients.data?.length ?? 0} cliente(s) cadastrado(s)
+          </h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {clients.data?.map((client) => (
+              <button
+                key={client.id}
+                type="button"
+                onClick={() => setSelectedId(client.id)}
+                className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition hover:border-primary hover:shadow-sm"
+              >
+                <ClientAvatar name={client.name} src={client.ig_picture_url} />
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{client.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {client.ig_username ? `@${client.ig_username}` : "Instagram não conectado"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {client.whatsapp_phone ? `WhatsApp ${client.whatsapp_phone}` : "Sem WhatsApp"}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </AppShell>
+  );
+}
+
+function ClientAvatar({ name, src }: { name: string; src: string | null }) {
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        className="h-14 w-14 shrink-0 rounded-full border object-cover"
+        referrerPolicy="no-referrer"
+      />
+    );
+  }
+  return (
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
+      {initials}
+    </div>
   );
 }
 
@@ -132,6 +189,7 @@ function ClientCard({
     name: string;
     ig_username: string | null;
     ig_user_id: string | null;
+    ig_picture_url: string | null;
     whatsapp_phone: string | null;
   };
   onChanged: () => void;
