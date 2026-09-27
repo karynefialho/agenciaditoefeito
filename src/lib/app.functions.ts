@@ -292,7 +292,7 @@ export const getPost = createServerFn({ method: "POST" })
     const { data: post, error } = await context.supabase
       .from("posts")
       .select(
-        "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username)",
+        "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username, ig_picture_url)",
       )
       .eq("id", data.id)
       .maybeSingle();
