@@ -161,3 +161,18 @@
     color: var(--color-foreground);
   }
 }
+
+@keyframes ig-heart-pop {
+  0% { transform: scale(0); opacity: 0; }
+  15% { transform: scale(1.2); opacity: 1; }
+  30% { transform: scale(0.95); }
+  45%, 80% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0; }
+}
+@keyframes ig-story-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+.ig-heart-pop { animation: ig-heart-pop 900ms ease-out forwards; }
+.ig-no-scrollbar { scrollbar-width: none; }
+.ig-no-scrollbar::-webkit-scrollbar { display: none; }
