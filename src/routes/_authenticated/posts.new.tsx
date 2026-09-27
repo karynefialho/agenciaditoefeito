@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
+import { InstagramMockup } from "@/components/instagram-mockup";
 import { MediaPreview } from "@/components/media-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ function NewPost() {
   const [caption, setCaption] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const selectedClient = clients.data?.find((c) => c.id === clientId);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -169,6 +171,17 @@ function NewPost() {
           {mutation.isPending ? "Enviando..." : "Enviar para aprovação"}
         </Button>
       </form>
+      <aside className="lg:sticky lg:top-6 lg:self-start">
+        <InstagramMockup
+          files={files}
+          kind={kind}
+          caption={caption}
+          scheduledAt={scheduledAt}
+          username={selectedClient?.ig_username ?? selectedClient?.name ?? "cliente"}
+          picture={selectedClient?.ig_picture_url ?? null}
+        />
+      </aside>
+      </div>
     </AppShell>
   );
 }
