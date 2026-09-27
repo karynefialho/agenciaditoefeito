@@ -38,6 +38,7 @@ export async function notifyReadyForApproval(postId: string) {
     phone: post.clients?.whatsapp_phone ?? null,
     body,
     kind: "ready_for_approval",
+    template: { name: "aprovo_conteudo_pronto", params: [formatDate(post.scheduled_at), `${APP_URL}/posts/${post.id}`] },
     clientId: post.client_id,
     postId: post.id,
   });
@@ -59,6 +60,7 @@ export async function notifyPublished(postId: string) {
     phone: post.clients?.whatsapp_phone ?? null,
     body,
     kind: "published",
+    template: { name: "aprovo_publicado", params: [`${APP_URL}/feed`] },
     clientId: post.client_id,
     postId: post.id,
   });
@@ -100,6 +102,7 @@ export async function sendApprovalReminders() {
       phone: post.clients?.whatsapp_phone ?? null,
       body,
       kind: "reminder",
+      template: { name: "aprovo_lembrete", params: [formatDate(post.scheduled_at), `${APP_URL}/posts/${post.id}`] },
       clientId: post.client_id,
       postId: post.id,
     });
@@ -125,6 +128,7 @@ export async function notifyWelcome(args: {
     phone: args.phone,
     body,
     kind: "welcome",
+    template: { name: "aprovo_boas_vindas", params: [args.clientName, APP_URL] },
     clientId: args.clientId,
     postId: null,
   });
