@@ -76,13 +76,15 @@ function NewPost() {
         O conteúdo só é publicado depois que o cliente aprovar, sempre no horário agendado.
       </p>
 
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
       <form
-        className="mt-8 max-w-2xl space-y-6"
+        className="space-y-6"
         onSubmit={(event) => {
           event.preventDefault();
           mutation.mutate();
         }}
       >
+
         <div className="space-y-2">
           <Label>Cliente</Label>
           <Select value={clientId} onValueChange={setClientId}>
