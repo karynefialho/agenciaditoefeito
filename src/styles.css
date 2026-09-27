@@ -176,3 +176,9 @@
 .ig-heart-pop { animation: ig-heart-pop 900ms ease-out forwards; }
 .ig-no-scrollbar { scrollbar-width: none; }
 .ig-no-scrollbar::-webkit-scrollbar { display: none; }
+
+#lovable-badge {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
