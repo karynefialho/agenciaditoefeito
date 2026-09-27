@@ -292,7 +292,7 @@ export const getPost = createServerFn({ method: "POST" })
     const { data: post, error } = await context.supabase
       .from("posts")
       .select(
-        "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username)",
+        "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username, ig_picture_url)",
       )
       .eq("id", data.id)
       .maybeSingle();
@@ -388,6 +388,84 @@ export const reviewPost = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .in("status", ["pending", "rejected", "approved"]);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Agency edits a post that was already sent; it goes back to the client for approval. */
+export const updatePost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      id: string;
+      kind: PostKind;
+      caption: string;
+      scheduledAt: string;
+      media?: { path: string; media_type: string }[] | undefined;
+      notifyClient: boolean;
+    }) => {
+      if (!input.scheduledAt) throw new Error("Escolha a data e hora.");
+      if (input.media && !input.media.length) throw new Error("Envie pelo menos um arquivo.");
+      return input;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode editar posts.");
+
+    const { data: current } = await context.supabase
+      .from("posts")
+      .select("status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!current) throw new Error("Post não encontrado.");
+    if (current.status === "published" || current.status === "publishing") {
+      throw new Error("Este post já foi publicado e não pode mais ser editado.");
+    }
+
+    const { error } = await context.supabase
+      .from("posts")
+      .update({
+        kind: data.kind,
+        caption: data.caption,
+        scheduled_at: new Date(data.scheduledAt).toISOString(),
+        status: "pending",
+        approved_at: null,
+        approved_by: null,
+        feedback: null,
+        error_message: null,
+        reminder_sent_at: null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    if (data.media) {
+      const { error: delError } = await context.supabase
+        .from("post_media")
+        .delete()
+        .eq("post_id", data.id);
+      if (delError) throw new Error(delError.message);
+      const { error: mediaError } = await context.supabase.from("post_media").insert(
+        data.media.map((m, index) => ({
+          post_id: data.id,
+          path: m.path,
+          media_type: m.media_type,
+          position: index,
+        })),
+      );
+      if (mediaError) throw new Error(mediaError.message);
+    }
+
+    if (data.notifyClient) {
+      try {
+        const { notifyReadyForApproval } = await import("@/lib/notify.server");
+        await notifyReadyForApproval(data.id);
+      } catch {
+        // edição salva mesmo se o aviso falhar
+      }
+    }
     return { ok: true };
   });
 
