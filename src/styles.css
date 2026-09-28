@@ -177,8 +177,23 @@
 .ig-no-scrollbar { scrollbar-width: none; }
 .ig-no-scrollbar::-webkit-scrollbar { display: none; }
 
-#lovable-badge {
+/* Completely remove Lovable branding widget, container, text, and close button */
+#lovable-badge,
+[id*="lovable-badge"],
+[class*="lovable-badge"],
+.lovable-badge,
+#lovable-badge-container,
+#lovable-badge-close {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
   pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  max-height: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  z-index: -9999 !important;
 }
+

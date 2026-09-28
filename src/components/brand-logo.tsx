@@ -1,15 +1,26 @@
-import darkLogo from "@/assets/dito-efeito-dark.png.asset.json";
-import lightLogo from "@/assets/dito-efeito-light.png.asset.json";
+import { useState } from "react";
 
 export function BrandLogo({ className = "h-7" }: { className?: string }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (imgError) {
+    return (
+      <div className={`flex items-center gap-2 font-bold tracking-tight text-foreground ${className}`}>
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-black text-xs shadow-sm">
+          DE
+        </div>
+        <span className="text-lg font-semibold tracking-tight">Dito Efeito</span>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <img src={darkLogo.url} alt="Dito Efeito" className={`${className} w-auto dark:hidden`} />
-      <img
-        src={lightLogo.url}
-        alt="Dito Efeito"
-        className={`${className} hidden w-auto dark:block`}
-      />
-    </>
+    <img
+      src="/dito-efeito-logo.png"
+      alt="Dito Efeito"
+      className={`${className} w-auto object-contain rounded-md`}
+      onError={() => setImgError(true)}
+    />
   );
 }
+
