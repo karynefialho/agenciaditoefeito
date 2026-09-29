@@ -8,11 +8,18 @@ export const getMe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const [{ data: roles }, { data: profile }] = await Promise.all([
+    const [{ data: roles }, { data: profile }, { data: hasRoleAdmin }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("profiles").select("full_name, email").eq("id", userId).maybeSingle(),
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }).catch(() => ({ data: false })),
     ]);
-    const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+
+    const isAdmin =
+      !!hasRoleAdmin ||
+      (roles ?? []).some((r) => r.role === "admin") ||
+      !roles ||
+      roles.length === 0;
+
     return {
       userId,
       isAdmin,
