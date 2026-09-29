@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
+import { WhatsappConnectModal } from "@/components/whatsapp-connect-modal";
 import { supabase } from "@/integrations/supabase/client";
 
 export function AppShell({
@@ -76,6 +77,7 @@ export function AppShell({
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3">
+            {isAdmin !== false && <WhatsappConnectModal />}
             <span className="hidden text-sm text-muted-foreground sm:inline">{email}</span>
             <Button variant="outline" size="sm" onClick={signOut}>
               Sair

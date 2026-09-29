@@ -357,15 +357,34 @@ function ClientCard({
               </Button>
             </div>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={resend.isPending || !client.whatsapp_phone}
-            onClick={() => resend.mutate()}
-          >
-            {resend.isPending ? "Enviando..." : "Enviar mensagem de boas-vindas"}
-          </Button>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={resend.isPending || !client.whatsapp_phone}
+              onClick={() => resend.mutate()}
+            >
+              {resend.isPending ? "Enviando..." : "Enviar aviso de boas-vindas"}
+            </Button>
+            {client.whatsapp_phone && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300"
+                onClick={() => {
+                  const phone = client.whatsapp_phone?.replace(/\D/g, "") ?? "";
+                  const msg = encodeURIComponent(
+                    `Olá ${client.name}! Seu cadastro foi realizado na plataforma Aprovô (Dito Efeito). Acesse seu painel em:\n\n👉 ${window.location.origin}/feed`
+                  );
+                  window.open(`https://wa.me/55${phone}?text=${msg}`, "_blank");
+                }}
+              >
+                Abrir no WhatsApp Web
+              </Button>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Usado para avisar sobre conteúdo novo, lembrete de aprovação e publicação.
           </p>

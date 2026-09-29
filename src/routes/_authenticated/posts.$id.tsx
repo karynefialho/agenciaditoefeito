@@ -217,6 +217,24 @@ function PostDetail() {
                       <Send className="mr-1 h-3.5 w-3.5" />
                       {resendNotification.isPending ? "Enviando..." : "Reenviar p/ aprovação"}
                     </Button>
+                    {client?.whatsapp_phone && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="text-xs gap-1 border border-emerald-600/20 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
+                        onClick={() => {
+                          const phone = client.whatsapp_phone?.replace(/\D/g, "") ?? "";
+                          const url = `${window.location.origin}/feed`;
+                          const msg = encodeURIComponent(
+                            `Olá ${client.name}! Tem post novo aguardando sua aprovação na plataforma Aprovô:\n\n👉 ${url}`
+                          );
+                          window.open(`https://wa.me/55${phone}?text=${msg}`, "_blank");
+                        }}
+                      >
+                        <Send className="h-3.5 w-3.5 text-emerald-600" />
+                        Abrir WhatsApp Web
+                      </Button>
+                    )}
                     {canEdit && (
                       <Button size="sm" variant="outline" onClick={startEdit}>
                         <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
