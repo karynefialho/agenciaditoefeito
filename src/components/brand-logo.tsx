@@ -16,9 +16,9 @@ export function BrandLogo({ className = "h-7" }: { className?: string }) {
 
   return (
     <img
-      src="/dito-efeito-logo.png"
+      src="/logo-ditoefeito.png"
       alt="Dito Efeito"
-      className={`${className} w-auto object-contain rounded-md`}
+      className={`${className} w-auto object-contain`}
       onError={() => setImgError(true)}
     />
   );
