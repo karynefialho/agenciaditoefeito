@@ -232,6 +232,29 @@ export const connectInstagram = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateClientInstagram = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { clientId: string; igUsername: string }) => ({
+    clientId: input.clientId,
+    igUsername: input.igUsername.trim().replace(/^@/, ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode alterar o Instagram.");
+
+    const { error } = await supabaseAdmin
+      .from("clients")
+      .update({ ig_username: data.igUsername || null })
+      .eq("id", data.clientId);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 export const inviteClientUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { clientId: string; email: string }) => ({

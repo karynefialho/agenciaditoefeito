@@ -15,6 +15,7 @@ import {
   listClients,
   listClientMembers,
   updateClientWhatsapp,
+  updateClientInstagram,
   resendWelcomeWhatsapp,
 } from "@/lib/app.functions";
 
@@ -210,8 +211,10 @@ function ClientCard({
 }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState(client.whatsapp_phone ?? "");
+  const [igUsername, setIgUsername] = useState(client.ig_username ?? "");
   const [addingEmail, setAddingEmail] = useState(false);
   const [editingPhone, setEditingPhone] = useState(!client.whatsapp_phone);
+  const [editingIg, setEditingIg] = useState(!client.ig_username);
   const members = useQuery({
     queryKey: ["client-members", client.id],
     queryFn: () => listClientMembers({ data: { clientId: client.id } }),
@@ -224,6 +227,16 @@ function ClientCard({
     onSuccess: () => {
       toast.success("WhatsApp salvo.");
       setEditingPhone(false);
+      onChanged();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
+  });
+
+  const saveIg = useMutation({
+    mutationFn: () => updateClientInstagram({ data: { clientId: client.id, igUsername } }),
+    onSuccess: () => {
+      toast.success("Instagram @ salvo com sucesso.");
+      setEditingIg(false);
       onChanged();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
@@ -259,7 +272,7 @@ function ClientCard({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium">{client.name}</h2>
         <span className="text-xs text-muted-foreground">
-          {client.ig_user_id ? `Instagram conectado${client.ig_username ? ` (@${client.ig_username})` : ""}` : "Instagram não conectado"}
+          {client.ig_username ? `@${client.ig_username}` : "Instagram não configurado"}
         </span>
       </div>
 
@@ -357,19 +370,54 @@ function ClientCard({
         </div>
 
         <div className="space-y-2">
-          <Label>Conta do Instagram</Label>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={startConnect.isPending}
-            onClick={() => startConnect.mutate()}
-          >
-            {startConnect.isPending ? "Abrindo o Instagram..." : "Conectar com Instagram"}
-          </Button>
+          <Label>Conta do Instagram (@usuario)</Label>
+          {editingIg ? (
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveIg.mutate();
+              }}
+            >
+              <Input
+                placeholder="@usuario_do_instagram"
+                value={igUsername}
+                onChange={(event) => setIgUsername(event.target.value)}
+              />
+              <Button type="submit" variant="outline" disabled={saveIg.isPending || !igUsername.trim()}>
+                Salvar @
+              </Button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-primary">✓</span>
+              <span className="truncate">@{client.ig_username}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-7"
+                onClick={() => setEditingIg(true)}
+              >
+                Alterar @
+              </Button>
+            </div>
+          )}
+
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={startConnect.isPending}
+              onClick={() => startConnect.mutate()}
+            >
+              {startConnect.isPending ? "Conectando..." : "Conectar via Meta / Instagram OAuth"}
+            </Button>
+          </div>
 
           <p className="text-xs text-muted-foreground">
-            Cada cliente faz login com a própria conta do Instagram (profissional). Após conectar,
-            os posts aprovados são publicados sozinhos no horário marcado.
+            Digite o @ do Instagram do cliente acima ou use o login automático da Meta.
           </p>
         </div>
       </div>
