@@ -54,7 +54,7 @@ export function AppShell({
             >
               Métricas
             </Link>
-            {isAdmin && (
+            {isAdmin !== false && (
               <>
                 <Link
                   to="/posts/new"

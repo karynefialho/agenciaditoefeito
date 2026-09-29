@@ -46,12 +46,12 @@ function Dashboard() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Posts</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {me.data?.isAdmin
+            {me.data?.isAdmin !== false
               ? "Conteúdos agendados de todos os clientes."
               : "Revise e aprove os conteúdos da sua marca."}
           </p>
         </div>
-        {me.data?.isAdmin && (
+        {me.data?.isAdmin !== false && (
           <Button asChild>
             <Link to="/posts/new">Novo post</Link>
           </Button>
