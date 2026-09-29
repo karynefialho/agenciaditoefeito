@@ -42,6 +42,7 @@ function ClientsPage() {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const clients = useQuery({ queryKey: ["clients"], queryFn: () => listClients() });
+  const [company, setCompany] = useState("");
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,11 +66,15 @@ function ClientsPage() {
   }, [queryClient]);
 
   const addClient = useMutation({
-    mutationFn: () => createClient({ data: { name, whatsapp } }),
+    mutationFn: () => {
+      const fullName = company && name ? `${company.trim()} (${name.trim()})` : (company || name).trim();
+      return createClient({ data: { name: fullName, whatsapp } });
+    },
     onSuccess: () => {
+      setCompany("");
       setName("");
       setWhatsapp("");
-      toast.success("Cliente cadastrado.");
+      toast.success("Cliente cadastrado com sucesso.");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro."),
@@ -87,20 +92,26 @@ function ClientsPage() {
 
   return (
     <AppShell isAdmin={me.data?.isAdmin} email={me.data?.email}>
-      <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Clientes & Marcas</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Cadastre a marca, convide quem aprova e conecte a conta do Instagram.
+        Cadastre a empresa/marca, informe o responsável, convide quem aprova e conecte o Instagram.
       </p>
 
       <form
-        className="mt-6 flex max-w-md gap-2"
+        className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
           addClient.mutate();
         }}
       >
         <Input
-          placeholder="Nome do cliente"
+          placeholder="Nome da Empresa / Marca *"
+          value={company}
+          onChange={(event) => setCompany(event.target.value)}
+          required
+        />
+        <Input
+          placeholder="Nome do Cliente / Responsável"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
@@ -109,9 +120,11 @@ function ClientsPage() {
           value={whatsapp}
           onChange={(event) => setWhatsapp(event.target.value)}
         />
-        <Button type="submit" disabled={addClient.isPending || !name.trim()}>
-          Adicionar
-        </Button>
+        <div className="sm:col-span-3">
+          <Button type="submit" disabled={addClient.isPending || (!company.trim() && !name.trim())}>
+            {addClient.isPending ? "Cadastrando..." : "Cadastrar Cliente / Marca"}
+          </Button>
+        </div>
       </form>
 
       {selected ? (

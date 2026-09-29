@@ -102,3 +102,20 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
+
+export function FormatBadge({ kind }: { kind: string }) {
+  const map: Record<string, { label: string; icon: string; className: string }> = {
+    image: { label: "Post Estático", icon: "📷", className: "bg-blue-100 text-blue-900 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800" },
+    carousel: { label: "Carrossel", icon: "📑", className: "bg-purple-100 text-purple-900 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800" },
+    reel: { label: "Vídeo / Reel", icon: "🎬", className: "bg-pink-100 text-pink-900 border-pink-200 dark:bg-pink-950/60 dark:text-pink-300 dark:border-pink-800" },
+    story: { label: "Story", icon: "📱", className: "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800" },
+  };
+  const item = map[kind] ?? { label: kind, icon: "📄", className: "bg-muted text-muted-foreground" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold shadow-2xs ${item.className}`}>
+      <span>{item.icon}</span>
+      <span>{item.label}</span>
+    </span>
+  );
+}
+

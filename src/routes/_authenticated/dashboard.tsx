@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-import { AppShell, StatusBadge } from "@/components/app-shell";
+import { AppShell, FormatBadge, StatusBadge } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getMe, listPosts } from "@/lib/app.functions";
 
@@ -77,9 +77,7 @@ function Dashboard() {
                 <span className="font-medium">
                   {(post as { clients?: { name?: string } }).clients?.name ?? "Cliente"}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {kindLabel[post.kind] ?? post.kind}
-                </span>
+                <FormatBadge kind={post.kind} />
               </div>
               <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
                 {post.caption || "Sem legenda"}

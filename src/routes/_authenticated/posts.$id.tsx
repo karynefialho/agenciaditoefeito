@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell, StatusBadge } from "@/components/app-shell";
+import { AppShell, FormatBadge, StatusBadge } from "@/components/app-shell";
 import { InstagramMockup, type MockupItem } from "@/components/instagram-mockup";
 import { MediaPreview } from "@/components/media-preview";
 import { Button } from "@/components/ui/button";
@@ -166,8 +166,9 @@ function PostDetail() {
 
           <div className="min-w-0 space-y-6">
             <div>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <h1 className="text-2xl font-semibold tracking-tight">{client?.name ?? "Post"}</h1>
+                <FormatBadge kind={data.kind} />
                 <StatusBadge status={data.status} />
                 {canEdit && !editing && (
                   <Button size="sm" variant="outline" className="ml-auto" onClick={startEdit}>

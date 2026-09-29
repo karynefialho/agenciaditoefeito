@@ -64,11 +64,25 @@ export function InstagramMockup({
     ? new Date(scheduledAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
     : "Data não definida";
 
+  const kindLabels: Record<PostKind, { label: string; icon: string }> = {
+    image: { label: "Post Estático", icon: "📷" },
+    carousel: { label: `Carrossel ${items.length > 0 ? `(${items.length} imagens)` : ""}`, icon: "📑" },
+    reel: { label: "Vídeo / Reel", icon: "🎬" },
+    story: { label: "Story", icon: "📱" },
+  };
+  const kindInfo = kindLabels[kind] ?? { label: kind, icon: "📄" };
+
   return (
-    <div className="space-y-3">
-      <p className="text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Como vai ficar no Instagram
-      </p>
+    <div className="notranslate space-y-3" translate="no">
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-semibold shadow-xs">
+          <span>{kindInfo.icon}</span>
+          <span>Formato: {kindInfo.label}</span>
+        </span>
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Prévia no Instagram
+        </p>
+      </div>
       <div className="relative mx-auto w-full max-w-[330px] rounded-[3rem] bg-phone-frame p-[10px] shadow-2xl ring-1 ring-border">
         {/* botões laterais */}
         <span className="absolute -left-[3px] top-28 h-8 w-[3px] rounded-l bg-phone-frame" />

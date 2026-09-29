@@ -28,6 +28,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -46,7 +47,10 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { full_name: name },
+            data: {
+              full_name: name,
+              company_name: company,
+            },
           },
         });
         if (error) throw error;
@@ -78,10 +82,26 @@ function AuthPage() {
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           {mode === "signup" && (
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="company">Nome da Empresa / Marca</Label>
+                <Input
+                  id="company"
+                  placeholder="Ex: Agência Dito Efeito"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome do Cliente / Responsável</Label>
+                <Input
+                  id="name"
+                  placeholder="Ex: Karyne Fialho"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            </>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
