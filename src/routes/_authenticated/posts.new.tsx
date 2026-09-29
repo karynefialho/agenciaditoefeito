@@ -18,7 +18,20 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { createPost, getMe, listClients, type PostKind } from "@/lib/app.functions";
+import { createPost, getMe, listClients, uploadPostMedia, type PostKind } from "@/lib/app.functions";
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const res = reader.result as string;
+      const base64 = res.split(",")[1];
+      resolve(base64 ?? "");
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
 
 export const Route = createFileRoute("/_authenticated/posts/new")({
   head: () => ({
@@ -53,13 +66,16 @@ function NewPost() {
 
       const media: { path: string; media_type: string }[] = [];
       for (const file of files) {
-        const ext = file.name.split(".").pop() ?? "jpg";
-        const path = `${clientId}/${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage.from("post-media").upload(path, file, {
-          contentType: file.type,
+        const base64 = await fileToBase64(file);
+        const uploaded = await uploadPostMedia({
+          data: {
+            clientId,
+            fileName: file.name,
+            contentType: file.type || "image/jpeg",
+            base64,
+          },
         });
-        if (error) throw new Error(error.message);
-        media.push({ path, media_type: file.type.startsWith("video") ? "video" : "image" });
+        media.push(uploaded);
       }
 
       return createPost({ data: { clientId, kind, caption, scheduledAt, media } });

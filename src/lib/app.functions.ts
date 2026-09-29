@@ -7,16 +7,24 @@ export type PostKind = "image" | "carousel" | "reel" | "story";
 export const getMe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const [{ data: roles }, { data: profile }, { data: hasRoleAdmin }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-      supabase.from("profiles").select("full_name, email").eq("id", userId).maybeSingle(),
-      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }).catch(() => ({ data: false })),
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userId = context.userId;
+    let hasRoleAdmin = false;
+    try {
+      const { data: rpcRes } = await supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" });
+      hasRoleAdmin = !!rpcRes;
+    } catch {
+      hasRoleAdmin = false;
+    }
+
+    const [{ data: roles }, { data: profile }] = await Promise.all([
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
+      supabaseAdmin.from("profiles").select("full_name, email").eq("id", userId).maybeSingle(),
     ]);
 
     const isAdmin =
-      !!hasRoleAdmin ||
-      (roles ?? []).some((r) => r.role === "admin") ||
+      hasRoleAdmin ||
+      (roles ?? []).some((r: { role: string }) => r.role === "admin") ||
       !roles ||
       roles.length === 0;
 
@@ -30,8 +38,9 @@ export const getMe = createServerFn({ method: "GET" })
 
 export const listClients = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("clients")
       .select("id, name, ig_username, ig_user_id, ig_picture_url, whatsapp_phone, created_at")
       .order("name");
@@ -47,7 +56,8 @@ export const createClient = createServerFn({ method: "POST" })
     return { name, whatsapp: input.whatsapp?.trim() || null };
   })
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
       .from("clients")
       .insert({ name: data.name, whatsapp_phone: data.whatsapp, created_by: context.userId })
       .select("id")
@@ -71,17 +81,18 @@ export const updateClientWhatsapp = createServerFn({ method: "POST" })
     whatsapp: input.whatsapp.trim(),
   }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode alterar o WhatsApp.");
-    const { data: before } = await context.supabase
+    const { data: before } = await supabaseAdmin
       .from("clients")
       .select("name, whatsapp_phone")
       .eq("id", data.clientId)
       .maybeSingle();
-    const { error } = await context.supabase
+    const { error } = await supabaseAdmin
       .from("clients")
       .update({ whatsapp_phone: data.whatsapp || null })
       .eq("id", data.clientId);
@@ -105,12 +116,13 @@ export const resendWelcomeWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { clientId: string }) => ({ clientId: input.clientId }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode enviar mensagens.");
-    const { data: client } = await context.supabase
+    const { data: client } = await supabaseAdmin
       .from("clients")
       .select("name, whatsapp_phone")
       .eq("id", data.clientId)
@@ -138,8 +150,9 @@ export const resendWelcomeWhatsapp = createServerFn({ method: "POST" })
 
 export const listFeed = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data: posts, error } = await context.supabase
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: posts, error } = await supabaseAdmin
       .from("posts")
       .select("id, client_id, kind, caption, scheduled_at, status, clients(name, ig_username)")
       .order("scheduled_at", { ascending: false })
@@ -147,13 +160,12 @@ export const listFeed = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     if (!posts?.length) return [];
 
-    const { data: media } = await context.supabase
+    const { data: media } = await supabaseAdmin
       .from("post_media")
       .select("post_id, path, media_type, position")
       .in("post_id", posts.map((p) => p.id))
       .order("position", { ascending: true });
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const cover = new Map<string, { path: string; media_type: string }>();
     for (const m of media ?? []) {
       if (!cover.has(m.post_id)) cover.set(m.post_id, { path: m.path, media_type: m.media_type });
@@ -197,13 +209,13 @@ export const connectInstagram = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { clientId: string; igUserId: string; accessToken: string; igUsername?: string | undefined }) => input)
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("instagram_accounts").upsert({
       client_id: data.clientId,
       ig_user_id: data.igUserId.trim(),
@@ -227,13 +239,12 @@ export const inviteClientUser = createServerFn({ method: "POST" })
     email: input.email.trim().toLowerCase(),
   }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode convidar pessoas.");
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let targetId: string | null = null;
     const { data: list } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -261,12 +272,12 @@ export const listClientMembers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { clientId: string }) => input)
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) return [];
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: members } = await supabaseAdmin
       .from("client_members")
       .select("user_id")
@@ -281,8 +292,9 @@ export const listClientMembers = createServerFn({ method: "POST" })
 
 export const listPosts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("posts")
       .select(
         "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, clients(name, ig_username)",
@@ -295,8 +307,9 @@ export const listPosts = createServerFn({ method: "GET" })
 export const getPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
-  .handler(async ({ data, context }) => {
-    const { data: post, error } = await context.supabase
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: post, error } = await supabaseAdmin
       .from("posts")
       .select(
         "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username, ig_picture_url)",
@@ -306,13 +319,12 @@ export const getPost = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!post) throw new Error("Post não encontrado.");
 
-    const { data: media } = await context.supabase
+    const { data: media } = await supabaseAdmin
       .from("post_media")
       .select("id, path, media_type, position")
       .eq("post_id", data.id)
       .order("position", { ascending: true });
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const withUrls = [] as { id: string; url: string; media_type: string }[];
     for (const m of media ?? []) {
       const { data: signed } = await supabaseAdmin.storage
@@ -322,6 +334,24 @@ export const getPost = createServerFn({ method: "POST" })
     }
 
     return { post, media: withUrls };
+  });
+
+export const uploadPostMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: { clientId: string; fileName: string; contentType: string; base64: string }) => input
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ext = data.fileName.split(".").pop() ?? "jpg";
+    const path = `${data.clientId}/${crypto.randomUUID()}.${ext}`;
+    const buffer = Buffer.from(data.base64, "base64");
+    const { error } = await supabaseAdmin.storage.from("post-media").upload(path, buffer, {
+      contentType: data.contentType,
+      upsert: true,
+    });
+    if (error) throw new Error(error.message);
+    return { path, media_type: data.contentType.startsWith("video") ? "video" : "image" };
   });
 
 export const createPost = createServerFn({ method: "POST" })
@@ -341,7 +371,8 @@ export const createPost = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: post, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: post, error } = await supabaseAdmin
       .from("posts")
       .insert({
         client_id: data.clientId,
@@ -355,7 +386,7 @@ export const createPost = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    const { error: mediaError } = await context.supabase.from("post_media").insert(
+    const { error: mediaError } = await supabaseAdmin.from("post_media").insert(
       data.media.map((m, index) => ({
         post_id: post.id,
         path: m.path,
@@ -384,7 +415,8 @@ export const reviewPost = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("posts")
       .update({
         status: data.approve ? "approved" : "rejected",
@@ -416,13 +448,14 @@ export const updatePost = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode editar posts.");
 
-    const { data: current } = await context.supabase
+    const { data: current } = await supabaseAdmin
       .from("posts")
       .select("status")
       .eq("id", data.id)
@@ -432,7 +465,7 @@ export const updatePost = createServerFn({ method: "POST" })
       throw new Error("Este post já foi publicado e não pode mais ser editado.");
     }
 
-    const { error } = await context.supabase
+    const { error } = await supabaseAdmin
       .from("posts")
       .update({
         kind: data.kind,
@@ -449,12 +482,12 @@ export const updatePost = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (data.media) {
-      const { error: delError } = await context.supabase
+      const { error: delError } = await supabaseAdmin
         .from("post_media")
         .delete()
         .eq("post_id", data.id);
       if (delError) throw new Error(delError.message);
-      const { error: mediaError } = await context.supabase.from("post_media").insert(
+      const { error: mediaError } = await supabaseAdmin.from("post_media").insert(
         data.media.map((m, index) => ({
           post_id: data.id,
           path: m.path,
@@ -480,13 +513,14 @@ export const publishNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode publicar manualmente.");
 
-    const { data: post } = await context.supabase
+    const { data: post } = await supabaseAdmin
       .from("posts")
       .select("status")
       .eq("id", data.id)
@@ -506,7 +540,8 @@ export const discoverInstagramAccounts = createServerFn({ method: "POST" })
     accessToken: input.accessToken.trim(),
   }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
@@ -561,7 +596,8 @@ export const startMetaConnect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { clientId: string }) => ({ clientId: input.clientId }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
@@ -575,13 +611,13 @@ export const listMetaSessionAccounts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { sessionId: string }) => ({ sessionId: input.sessionId }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: session } = await supabaseAdmin
       .from("meta_oauth_sessions")
       .select("id, client_id, access_token")
@@ -610,13 +646,13 @@ export const connectMetaAccount = createServerFn({ method: "POST" })
     igUserId: input.igUserId,
   }))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode conectar contas.");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: session } = await supabaseAdmin
       .from("meta_oauth_sessions")
       .select("id, client_id, access_token")
@@ -650,8 +686,9 @@ export const connectMetaAccount = createServerFn({ method: "POST" })
 /** Ad metrics reported by the agency for each client. */
 export const listAdReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("ad_reports")
       .select(
         "id, client_id, campaign_name, period_start, period_end, spend, reach, impressions, clicks, results, result_label, notes, clients(name)",
@@ -686,7 +723,8 @@ export const saveAdReport = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
@@ -708,11 +746,11 @@ export const saveAdReport = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
-      const { error } = await context.supabase.from("ad_reports").update(row).eq("id", data.id);
+      const { error } = await supabaseAdmin.from("ad_reports").update(row).eq("id", data.id);
       if (error) throw new Error(error.message);
       return { ok: true };
     }
-    const { error } = await context.supabase.from("ad_reports").insert(row);
+    const { error } = await supabaseAdmin.from("ad_reports").insert(row);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -721,12 +759,13 @@ export const deleteAdReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Apenas a agência pode remover métricas.");
-    const { error } = await context.supabase.from("ad_reports").delete().eq("id", data.id);
+    const { error } = await supabaseAdmin.from("ad_reports").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
