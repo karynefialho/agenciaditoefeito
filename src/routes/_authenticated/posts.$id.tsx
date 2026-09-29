@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { Pencil } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  deletePost,
   getMe,
   getPost,
   publishNow,
@@ -68,6 +69,7 @@ function toLocalInput(iso: string) {
 type ClientInfo = { name?: string; ig_username?: string | null; ig_picture_url?: string | null };
 
 function PostDetail() {
+  const navigate = useNavigate();
   const { id } = Route.useParams();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
@@ -125,6 +127,16 @@ function PostDetail() {
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Não foi possível publicar."),
+  });
+
+  const removePost = useMutation({
+    mutationFn: () => deletePost({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Post excluído.");
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      navigate({ to: "/dashboard" });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao excluir."),
   });
 
   const save = useMutation({
@@ -187,10 +199,26 @@ function PostDetail() {
                 <h1 className="text-2xl font-semibold tracking-tight">{client?.name ?? "Post"}</h1>
                 <FormatBadge kind={data.kind} />
                 <StatusBadge status={data.status} />
-                {canEdit && !editing && (
-                  <Button size="sm" variant="outline" className="ml-auto" onClick={startEdit}>
-                    <Pencil className="mr-1 h-4 w-4" /> Editar post
-                  </Button>
+                {isAdmin && !editing && (
+                  <div className="ml-auto flex items-center gap-2">
+                    {canEdit && (
+                      <Button size="sm" variant="outline" onClick={startEdit}>
+                        <Pencil className="mr-1 h-4 w-4" /> Editar post
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={removePost.isPending}
+                      onClick={() => {
+                        if (confirm("Tem certeza que deseja excluir este post?")) {
+                          removePost.mutate();
+                        }
+                      }}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" /> Excluir post
+                    </Button>
+                  </div>
                 )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">

@@ -453,6 +453,24 @@ export const reviewPost = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const deletePost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode excluir posts.");
+
+    await supabaseAdmin.from("post_media").delete().eq("post_id", data.id);
+    const { error } = await supabaseAdmin.from("posts").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 /** Agency edits a post that was already sent; it goes back to the client for approval. */
 export const updatePost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
