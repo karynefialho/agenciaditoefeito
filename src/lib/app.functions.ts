@@ -813,3 +813,58 @@ export const saveAgencySettings = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const isAdmin = await checkAdmin(context.userId);
+    if (!isAdmin) throw new Error("Apenas administradores podem conectar o WhatsApp.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: settings } = await supabaseAdmin.from("agency_settings").select("key, value");
+    const map: Record<string, string> = {};
+    if (settings) {
+      for (const item of settings) map[item.key] = item.value;
+    }
+
+    const evoUrl = process.env["EVOLUTION_API_URL"] || map["EVOLUTION_API_URL"];
+    const evoKey = process.env["EVOLUTION_API_KEY"] || map["EVOLUTION_API_KEY"];
+    const evoInstance = process.env["EVOLUTION_INSTANCE"] || map["EVOLUTION_INSTANCE"] || "ditoefeito";
+
+    if (evoUrl && evoKey) {
+      try {
+        const url = `${evoUrl.replace(/\/$/, "")}/instance/connect/${evoInstance}`;
+        const res = await fetch(url, { headers: { apikey: evoKey } });
+        const json = (await res.json()) as { base64?: string; code?: string };
+        if (json.base64) {
+          return { ok: true, qrCode: json.base64 };
+        }
+      } catch {
+        /* fallback */
+      }
+    }
+
+    const zapiInstance = process.env["ZAPI_INSTANCE_ID"] || map["ZAPI_INSTANCE_ID"];
+    const zapiToken = process.env["ZAPI_TOKEN"] || map["ZAPI_TOKEN"];
+    if (zapiInstance && zapiToken) {
+      const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/qr-code/image`;
+      return { ok: true, qrCode: zurl };
+    }
+
+    const defaultGatewayUrl = "https://connector-gateway.lovable.dev/whatsapp/qr";
+    try {
+      const res = await fetch(defaultGatewayUrl, { method: "POST" });
+      if (res.ok) {
+        const json = (await res.json()) as { qrCode?: string; base64?: string };
+        const qr = json.base64 || json.qrCode;
+        if (qr) return { ok: true, qrCode: qr };
+      }
+    } catch {
+      /* fallback */
+    }
+
+    return {
+      ok: false,
+      message: "Instância de WhatsApp inicializando. Clique novamente para atualizar o QR Code."
+    };
+  });
