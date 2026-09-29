@@ -66,7 +66,7 @@ function AuthPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm rounded-xl border bg-card p-8">
-        <BrandLogo className="mb-6 h-6" />
+        <BrandLogo className="mb-6 h-12 sm:h-14" />
         <h1 className="text-2xl font-semibold tracking-tight">
           {mode === "signin" ? "Entrar" : "Criar conta"}
         </h1>

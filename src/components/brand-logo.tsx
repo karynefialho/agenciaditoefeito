@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export function BrandLogo({ className = "h-7" }: { className?: string }) {
+export function BrandLogo({ className = "h-10 sm:h-12" }: { className?: string }) {
   const [imgError, setImgError] = useState(false);
 
   if (imgError) {

@@ -34,7 +34,7 @@ function PrivacyPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-          <BrandLogo className="h-8" />
+          <BrandLogo className="h-10 sm:h-12" />
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
             Voltar
           </Link>

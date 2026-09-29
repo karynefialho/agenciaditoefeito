@@ -30,7 +30,7 @@ export function AppShell({
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-4">
           <Link to="/dashboard" className="flex items-center">
-            <BrandLogo className="h-6" />
+            <BrandLogo className="h-10 sm:h-12" />
           </Link>
           <nav className="flex items-center gap-1 text-sm">
             <Link

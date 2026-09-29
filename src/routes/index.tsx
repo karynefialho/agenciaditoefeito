@@ -30,7 +30,7 @@ function Index() {
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <BrandLogo className="h-7" />
+        <BrandLogo className="h-12 sm:h-14" />
         <Button asChild variant="outline">
           <Link to="/auth">Entrar</Link>
         </Button>
