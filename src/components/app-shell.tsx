@@ -33,24 +33,26 @@ export function AppShell({
             <BrandLogo className="h-10 sm:h-12" />
           </Link>
           <nav className="flex items-center gap-1 text-sm">
+            {isAdmin === false && (
+              <Link
+                to="/feed"
+                className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground font-medium" }}
+              >
+                Feed (Instagram)
+              </Link>
+            )}
             <Link
               to="/dashboard"
               className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground" }}
+              activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground font-medium" }}
             >
               Posts
             </Link>
             <Link
-              to="/feed"
-              className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground" }}
-            >
-              Feed
-            </Link>
-            <Link
               to="/metrics"
               className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground" }}
+              activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground font-medium" }}
             >
               Métricas
             </Link>
@@ -59,14 +61,14 @@ export function AppShell({
                 <Link
                   to="/posts/new"
                   className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground" }}
+                  activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground font-medium" }}
                 >
                   Novo post
                 </Link>
                 <Link
                   to="/clients"
                   className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground" }}
+                  activeProps={{ className: "rounded-md px-3 py-1.5 bg-accent text-accent-foreground font-medium" }}
                 >
                   Clientes
                 </Link>
