@@ -94,7 +94,67 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 3. Lovable WhatsApp Gateway
+  // 3. Direct Meta WhatsApp Cloud API Integration
+  const metaToken = process.env["META_WHATSAPP_TOKEN"] || process.env["WHATSAPP_ACCESS_TOKEN"] || process.env["META_ACCESS_TOKEN"];
+  const metaPhoneId = process.env["META_WHATSAPP_PHONE_NUMBER_ID"] || process.env["WHATSAPP_PHONE_NUMBER_ID"] || process.env["PHONE_NUMBER_ID"];
+  if (metaToken && metaPhoneId) {
+    try {
+      const metaUrl = `https://graph.facebook.com/v19.0/${metaPhoneId}/messages`;
+      const metaHeaders = {
+        Authorization: `Bearer ${metaToken}`,
+        "Content-Type": "application/json",
+      };
+
+      let metaPayload: Record<string, unknown>;
+      if (args.template) {
+        metaPayload = {
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "template",
+          template: {
+            name: args.template.name,
+            language: { code: "pt_BR" },
+            components: [
+              {
+                type: "body",
+                parameters: args.template.params.map((text) => ({ type: "text", text })),
+              },
+            ],
+          },
+        };
+      } else {
+        metaPayload = {
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: phone,
+          type: "text",
+          text: { preview_url: true, body: args.body },
+        };
+      }
+
+      const metaRes = await fetch(metaUrl, {
+        method: "POST",
+        headers: metaHeaders,
+        body: JSON.stringify(metaPayload),
+      });
+
+      const metaData = (await metaRes.json().catch(() => ({}))) as { error?: { message?: string } };
+      if (metaRes.ok) {
+        await log({ ...args, phone, status: "sent" });
+        return { sent: true as const };
+      } else {
+        const errMsg = metaData?.error?.message || `HTTP ${metaRes.status}`;
+        await log({ ...args, phone, status: "failed", errorMessage: errMsg });
+        return { sent: false as const, reason: "error" as const, error: errMsg };
+      }
+    } catch (metaErr) {
+      const errMsg = metaErr instanceof Error ? metaErr.message : "Erro na API Meta WhatsApp";
+      await log({ ...args, phone, status: "failed", errorMessage: errMsg });
+      return { sent: false as const, reason: "error" as const, error: errMsg };
+    }
+  }
+
+  // 4. Lovable WhatsApp Gateway
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const connectionKey = process.env["WHATSAPP_API_KEY"];
   if (!lovableKey || !connectionKey) {
