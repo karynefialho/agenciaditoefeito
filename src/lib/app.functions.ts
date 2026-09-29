@@ -471,6 +471,23 @@ export const deletePost = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const resendApprovalNotification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Apenas a agência pode reenviar avisos.");
+
+    const { notifyReadyForApproval } = await import("@/lib/notify.server");
+    await notifyReadyForApproval(data.id);
+
+    return { ok: true };
+  });
+
 /** Agency edits a post that was already sent; it goes back to the client for approval. */
 export const updatePost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -128,8 +128,15 @@ function StatusBar({ light }: { light?: boolean }) {
 }
 
 function Avatar({ picture, handle, size = 32, ring }: { picture: string | null; handle: string; size?: number; ring?: boolean }) {
-  const inner = picture ? (
-    <img src={picture} alt="" referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" />
+  const [imgError, setImgError] = useState(false);
+  const inner = picture && !imgError ? (
+    <img
+      src={picture}
+      alt={handle}
+      referrerPolicy="no-referrer"
+      onError={() => setImgError(true)}
+      className="h-full w-full rounded-full object-cover"
+    />
   ) : (
     <div className="flex h-full w-full items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
       {handle.slice(0, 1).toUpperCase() || "?"}

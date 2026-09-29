@@ -41,6 +41,7 @@ function FeedPage() {
   const clients = useQuery({ queryKey: ["clients"], queryFn: () => listClients() });
   const [selectedClientName, setSelectedClientName] = useState<string>("todos");
   const [activeTab, setActiveTab] = useState<"posts" | "reels">("posts");
+  const [avatarError, setAvatarError] = useState(false);
 
   const clientNames = Array.from(new Set((feed.data ?? []).map((item) => item.clientName)));
   const items = (feed.data ?? []).filter((item) => {
@@ -71,7 +72,10 @@ function FeedPage() {
             <select
               className="h-9 rounded-md border bg-background px-3 text-sm font-medium"
               value={selectedClientName}
-              onChange={(event) => setSelectedClientName(event.target.value)}
+              onChange={(event) => {
+                setSelectedClientName(event.target.value);
+                setAvatarError(false);
+              }}
             >
               <option value="todos">Todos os clientes</option>
               {clientNames.map((name) => (
@@ -93,10 +97,12 @@ function FeedPage() {
             <div className="relative shrink-0">
               <div className="rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 p-[3px]">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-card p-[2px]">
-                  {avatarSrc ? (
+                  {avatarSrc && !avatarError ? (
                     <img
                       src={avatarSrc}
                       alt={selectedClientName}
+                      referrerPolicy="no-referrer"
+                      onError={() => setAvatarError(true)}
                       className="h-full w-full rounded-full object-cover"
                     />
                   ) : (

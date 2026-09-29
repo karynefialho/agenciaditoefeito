@@ -172,19 +172,21 @@ function ClientsPage() {
 }
 
 function ClientAvatar({ name, src }: { name: string; src: string | null }) {
+  const [imgError, setImgError] = useState(false);
   const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join("");
-  if (src) {
+  if (src && !imgError) {
     return (
       <img
         src={src}
         alt={name}
         className="h-14 w-14 shrink-0 rounded-full border object-cover"
         referrerPolicy="no-referrer"
+        onError={() => setImgError(true)}
       />
     );
   }

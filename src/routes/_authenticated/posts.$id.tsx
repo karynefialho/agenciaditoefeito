@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Send, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import {
   getMe,
   getPost,
   publishNow,
+  resendApprovalNotification,
   reviewPost,
   updatePost,
   uploadPostMedia,
@@ -139,6 +140,12 @@ function PostDetail() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao excluir."),
   });
 
+  const resendNotification = useMutation({
+    mutationFn: () => resendApprovalNotification({ data: { id } }),
+    onSuccess: () => toast.success("Aviso enviado para o WhatsApp do cliente."),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao enviar aviso."),
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       if (!data) throw new Error("Post não carregado.");
@@ -200,10 +207,19 @@ function PostDetail() {
                 <FormatBadge kind={data.kind} />
                 <StatusBadge status={data.status} />
                 {isAdmin && !editing && (
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resendNotification.isPending}
+                      onClick={() => resendNotification.mutate()}
+                    >
+                      <Send className="mr-1 h-3.5 w-3.5" />
+                      {resendNotification.isPending ? "Enviando..." : "Reenviar p/ aprovação"}
+                    </Button>
                     {canEdit && (
                       <Button size="sm" variant="outline" onClick={startEdit}>
-                        <Pencil className="mr-1 h-4 w-4" /> Editar post
+                        <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
                       </Button>
                     )}
                     <Button
@@ -216,7 +232,7 @@ function PostDetail() {
                         }
                       }}
                     >
-                      <Trash2 className="mr-1 h-4 w-4" /> Excluir post
+                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Excluir
                     </Button>
                   </div>
                 )}
