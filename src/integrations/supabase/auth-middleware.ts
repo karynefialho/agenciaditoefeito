@@ -69,7 +69,24 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Error('Unauthorized: No token provided');
     }
 
-    if (token.split('.').length !== 3) {
+    const SUPABASE_SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+    const adminKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_PUBLISHABLE_KEY;
+
+    const authClient = createClient<Database>(
+      SUPABASE_URL!,
+      adminKey!,
+      {
+        auth: {
+          storage: undefined,
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
+
+    const { data, error } = await authClient.auth.getUser(token);
+    if (error || !data?.user) {
+      console.error('[Supabase Auth Middleware] getUser error:', error?.message);
       throw new Error('Unauthorized: Invalid token');
     }
 
@@ -90,11 +107,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         },
       }
     );
-
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) {
-      throw new Error('Unauthorized: Invalid token');
-    }
 
     return next({
       context: {
