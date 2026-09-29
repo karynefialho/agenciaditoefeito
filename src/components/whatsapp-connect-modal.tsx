@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { QrCode, CheckCircle2, Smartphone, AlertCircle, Send, RefreshCw, KeyRound, ExternalLink } from "lucide-react";
 
@@ -14,29 +14,64 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getAgencySettings, saveAgencySettings } from "@/lib/app.functions";
+
 export function WhatsappConnectModal() {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<"disconnected" | "generating" | "qr_ready" | "connected">("disconnected");
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   
-  // Custom API keys stored locally in browser/localStorage if user prefers
-  const [zapiInstance, setZapiInstance] = useState(() => localStorage.getItem("ZAPI_INSTANCE_ID") ?? "");
-  const [zapiToken, setZapiToken] = useState(() => localStorage.getItem("ZAPI_TOKEN") ?? "");
+  const settingsQuery = useQuery({
+    queryKey: ["agency-settings"],
+    queryFn: () => getAgencySettings(),
+  });
+
+  const [zapiInstance, setZapiInstance] = useState("");
+  const [zapiToken, setZapiToken] = useState("");
+  const [evoUrl, setEvoUrl] = useState("");
+  const [evoKey, setEvoKey] = useState("");
+  const [evoInstance, setEvoInstance] = useState("");
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
 
-  function handleSaveCredentials() {
-    if (zapiInstance) localStorage.setItem("ZAPI_INSTANCE_ID", zapiInstance.trim());
-    else localStorage.removeItem("ZAPI_INSTANCE_ID");
+  useEffect(() => {
+    if (settingsQuery.data) {
+      if (settingsQuery.data["ZAPI_INSTANCE_ID"]) setZapiInstance(settingsQuery.data["ZAPI_INSTANCE_ID"]);
+      if (settingsQuery.data["ZAPI_TOKEN"]) setZapiToken(settingsQuery.data["ZAPI_TOKEN"]);
+      if (settingsQuery.data["EVOLUTION_API_URL"]) setEvoUrl(settingsQuery.data["EVOLUTION_API_URL"]);
+      if (settingsQuery.data["EVOLUTION_API_KEY"]) setEvoKey(settingsQuery.data["EVOLUTION_API_KEY"]);
+      if (settingsQuery.data["EVOLUTION_INSTANCE"]) setEvoInstance(settingsQuery.data["EVOLUTION_INSTANCE"]);
 
-    if (zapiToken) localStorage.setItem("ZAPI_TOKEN", zapiToken.trim());
-    else localStorage.removeItem("ZAPI_TOKEN");
-
-    toast.success("Credenciais salvas com sucesso!");
-    if (zapiInstance && zapiToken) {
-      setStatus("connected");
-      setConnectedPhone("Instância Z-API Ativa");
+      if (settingsQuery.data["ZAPI_INSTANCE_ID"] || settingsQuery.data["EVOLUTION_API_URL"]) {
+        setStatus("connected");
+        setConnectedPhone(settingsQuery.data["ZAPI_INSTANCE_ID"] ? "Z-API Ativa" : "Evolution API Ativa");
+      }
     }
+  }, [settingsQuery.data]);
+
+  const saveMutation = useMutation({
+    mutationFn: (newSettings: Record<string, string>) => saveAgencySettings({ data: { settings: newSettings } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency-settings"] });
+      toast.success("Configurações do WhatsApp salvas no Supabase!");
+      setStatus("connected");
+      setConnectedPhone("Instância Ativa");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar no banco");
+    },
+  });
+
+  function handleSaveCredentials() {
+    saveMutation.mutate({
+      ZAPI_INSTANCE_ID: zapiInstance.trim(),
+      ZAPI_TOKEN: zapiToken.trim(),
+      EVOLUTION_API_URL: evoUrl.trim(),
+      EVOLUTION_API_KEY: evoKey.trim(),
+      EVOLUTION_INSTANCE: evoInstance.trim(),
+    });
   }
 
   function handleGenerateQr() {

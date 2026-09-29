@@ -29,11 +29,27 @@ async function log(entry: LogInput) {
   });
 }
 
+async function getStoredSettings(): Promise<Record<string, string>> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.from("agency_settings").select("key, value");
+    if (!data) return {};
+    const map: Record<string, string> = {};
+    for (const item of data) {
+      map[item.key] = item.value;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Sends a WhatsApp message through:
- * 1. Z-API (if ZAPI_INSTANCE_ID & ZAPI_TOKEN env vars are set)
- * 2. Evolution API (if EVOLUTION_API_URL & EVOLUTION_API_KEY env vars are set)
- * 3. Lovable WhatsApp Gateway (if LOVABLE_API_KEY & WHATSAPP_API_KEY are set)
+ * 1. Z-API (if ZAPI_INSTANCE_ID & ZAPI_TOKEN env vars or DB settings are set)
+ * 2. Evolution API (if EVOLUTION_API_URL & EVOLUTION_API_KEY env vars or DB settings are set)
+ * 3. Meta WhatsApp Cloud API
+ * 4. Lovable WhatsApp Gateway
  */
 export async function sendWhatsApp(args: {
   phone: string | null | undefined;
@@ -49,13 +65,15 @@ export async function sendWhatsApp(args: {
     return { sent: false as const, reason: "no-phone" as const };
   }
 
+  const dbSettings = await getStoredSettings();
+
   // 1. Z-API Integration
-  const zapiInstance = process.env["ZAPI_INSTANCE_ID"];
-  const zapiToken = process.env["ZAPI_TOKEN"];
+  const zapiInstance = process.env["ZAPI_INSTANCE_ID"] || dbSettings["ZAPI_INSTANCE_ID"];
+  const zapiToken = process.env["ZAPI_TOKEN"] || dbSettings["ZAPI_TOKEN"];
   if (zapiInstance && zapiToken) {
     try {
       const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`;
-      const zclientToken = process.env["ZAPI_CLIENT_TOKEN"];
+      const zclientToken = process.env["ZAPI_CLIENT_TOKEN"] || dbSettings["ZAPI_CLIENT_TOKEN"];
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (zclientToken) headers["Client-Token"] = zclientToken;
 
@@ -74,9 +92,9 @@ export async function sendWhatsApp(args: {
   }
 
   // 2. Evolution API Integration
-  const evoUrl = process.env["EVOLUTION_API_URL"];
-  const evoKey = process.env["EVOLUTION_API_KEY"];
-  const evoInstance = process.env["EVOLUTION_INSTANCE"];
+  const evoUrl = process.env["EVOLUTION_API_URL"] || dbSettings["EVOLUTION_API_URL"];
+  const evoKey = process.env["EVOLUTION_API_KEY"] || dbSettings["EVOLUTION_API_KEY"];
+  const evoInstance = process.env["EVOLUTION_INSTANCE"] || dbSettings["EVOLUTION_INSTANCE"];
   if (evoUrl && evoKey && evoInstance) {
     try {
       const url = `${evoUrl.replace(/\/$/, "")}/message/sendText/${evoInstance}`;
@@ -95,8 +113,8 @@ export async function sendWhatsApp(args: {
   }
 
   // 3. Direct Meta WhatsApp Cloud API Integration
-  const metaToken = process.env["META_WHATSAPP_TOKEN"] || process.env["WHATSAPP_ACCESS_TOKEN"] || process.env["META_ACCESS_TOKEN"];
-  const metaPhoneId = process.env["META_WHATSAPP_PHONE_NUMBER_ID"] || process.env["WHATSAPP_PHONE_NUMBER_ID"] || process.env["PHONE_NUMBER_ID"];
+  const metaToken = process.env["META_WHATSAPP_TOKEN"] || process.env["WHATSAPP_ACCESS_TOKEN"] || process.env["META_ACCESS_TOKEN"] || dbSettings["META_WHATSAPP_TOKEN"];
+  const metaPhoneId = process.env["META_WHATSAPP_PHONE_NUMBER_ID"] || process.env["WHATSAPP_PHONE_NUMBER_ID"] || process.env["PHONE_NUMBER_ID"] || dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"];
   if (metaToken && metaPhoneId) {
     try {
       const metaUrl = `https://graph.facebook.com/v19.0/${metaPhoneId}/messages`;

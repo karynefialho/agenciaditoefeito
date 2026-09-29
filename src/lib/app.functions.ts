@@ -777,3 +777,39 @@ export const deleteAdReport = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const getAgencySettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    try {
+      const { data } = await supabaseAdmin.from("agency_settings").select("key, value");
+      const map: Record<string, string> = {};
+      if (data) {
+        for (const item of data) {
+          map[item.key] = item.value;
+        }
+      }
+      return map;
+    } catch {
+      return {};
+    }
+  });
+
+export const saveAgencySettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { settings: Record<string, string> }) => input)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const isAdmin = await checkAdmin(context.userId);
+    if (!isAdmin) throw new Error("Apenas a agência pode alterar configurações.");
+
+    for (const [key, value] of Object.entries(data.settings)) {
+      if (value) {
+        await supabaseAdmin.from("agency_settings").upsert({ key, value });
+      } else {
+        await supabaseAdmin.from("agency_settings").delete().eq("key", key);
+      }
+    }
+    return { ok: true };
+  });

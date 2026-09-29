@@ -242,3 +242,16 @@ CREATE POLICY "read post media files" ON storage.objects FOR SELECT TO authentic
 CREATE POLICY "upload post media files" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'post-media');
 CREATE POLICY "update post media files" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'post-media');
 CREATE POLICY "delete post media files" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'post-media');
+
+-- 14. Tabela de Configurações da Agência (WhatsApp API, Z-API, Evolution, etc.)
+CREATE TABLE IF NOT EXISTS public.agency_settings (
+  key text PRIMARY KEY,
+  value text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT ALL ON public.agency_settings TO authenticated;
+GRANT ALL ON public.agency_settings TO service_role;
+ALTER TABLE public.agency_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admins manage agency settings" ON public.agency_settings FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
