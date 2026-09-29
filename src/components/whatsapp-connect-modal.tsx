@@ -74,17 +74,45 @@ export function WhatsappConnectModal() {
     });
   }
 
-  function handleGenerateQr() {
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+
+  async function handleGenerateQr() {
     setStatus("generating");
-    setTimeout(() => {
+    setQrCodeImage(null);
+
+    // Try Evolution API if credentials exist
+    if (evoUrl && evoKey && evoInstance) {
+      try {
+        const url = `${evoUrl.replace(/\/$/, "")}/instance/connect/${evoInstance}`;
+        const res = await fetch(url, { headers: { apikey: evoKey } });
+        const data = (await res.json()) as { base64?: string; code?: string };
+        if (data.base64) {
+          setQrCodeImage(data.base64);
+          setStatus("qr_ready");
+          toast.success("QR Code real da Evolution API gerado!");
+          return;
+        }
+      } catch {
+        /* fallback */
+      }
+    }
+
+    // Try Z-API if credentials exist
+    if (zapiInstance && zapiToken) {
+      const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/qr-code/image`;
+      setQrCodeImage(zurl);
       setStatus("qr_ready");
-      toast.info("Escaneie o QR Code abaixo com seu WhatsApp");
-    }, 1200);
+      toast.success("QR Code real da Z-API gerado!");
+      return;
+    }
+
+    toast.error("Insira a URL/Chave da sua Evolution API ou Z-API nos campos abaixo para gerar o QR Code real de conexão.");
+    setStatus("disconnected");
   }
 
   function handleSimulateScan() {
     setStatus("connected");
-    setConnectedPhone("+55 (81) 98888-7777");
+    setConnectedPhone("Conectado");
     toast.success("WhatsApp da Agência conectado com sucesso!");
   }
 
@@ -114,14 +142,14 @@ export function WhatsappConnectModal() {
           <span>Conectar WhatsApp</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md sm:max-w-lg">
+      <DialogContent className="max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <Smartphone className="h-5 w-5 text-emerald-600" />
             Conexão WhatsApp (QR Code)
           </DialogTitle>
           <DialogDescription>
-            Conecte o WhatsApp da sua agência para disparar avisos automáticos de aprovação para os clientes.
+            Conecte a instância de WhatsApp da sua agência para disparar avisos automáticos para os clientes.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,9 +172,9 @@ export function WhatsappConnectModal() {
                   ) : status === "qr_ready" ? (
                     <span className="text-sky-600">Aguardando Leitura do QR Code...</span>
                   ) : status === "generating" ? (
-                    <span className="text-amber-600">Gerando QR Code...</span>
+                    <span className="text-amber-600">Gerando QR Code Real...</span>
                   ) : (
-                    <span className="text-muted-foreground">Desconectado</span>
+                    <span className="text-muted-foreground">Desconectado (Chaves pendentes)</span>
                   )}
                 </p>
               </div>
@@ -166,14 +194,14 @@ export function WhatsappConnectModal() {
                   <QrCode className="h-8 w-8" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-base">Conectar via QR Code</h4>
+                  <h4 className="font-semibold text-base">Gerar QR Code Real</h4>
                   <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                    Gere o QR Code para conectar o WhatsApp da agência lendo na câmera do seu celular.
+                    Preencha os dados do seu servidor de WhatsApp abaixo e clique em gerar QR Code para escanear com a câmera.
                   </p>
                 </div>
                 <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-2">
                   <RefreshCw className="h-4 w-4" />
-                  Gerar QR Code de Conexão
+                  Gerar QR Code Real
                 </Button>
               </div>
             )}
@@ -181,29 +209,18 @@ export function WhatsappConnectModal() {
             {status === "generating" && (
               <div className="py-8 text-center space-y-3">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
-                <p className="text-sm font-medium text-muted-foreground">Carregando novo QR Code...</p>
+                <p className="text-sm font-medium text-muted-foreground">Conectando ao servidor e gerando QR Code real...</p>
               </div>
             )}
 
             {status === "qr_ready" && (
               <div className="text-center space-y-4">
-                <div className="relative mx-auto rounded-lg bg-white p-3 shadow-md border w-52 h-52 flex items-center justify-center">
-                  {/* Visual simulated QR code SVG */}
-                  <svg className="w-44 h-44" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="100" height="100" fill="white"/>
-                    <path d="M0 0H35V35H0V0ZM10 10V25H25V10H10Z" fill="#059669"/>
-                    <path d="M15 15H20V20H15V15Z" fill="#059669"/>
-                    <path d="M65 0H100V35H65V0ZM75 10V25H90V10H75Z" fill="#059669"/>
-                    <path d="M80 15H85V20H80V15Z" fill="#059669"/>
-                    <path d="M0 65H35V100H0V65ZM10 75V90H25V75H10Z" fill="#059669"/>
-                    <path d="M15 80H20V85H15V80Z" fill="#059669"/>
-                    <rect x="40" y="10" width="15" height="15" fill="#059669"/>
-                    <rect x="40" y="40" width="20" height="20" fill="#059669"/>
-                    <rect x="65" y="45" width="10" height="15" fill="#059669"/>
-                    <rect x="80" y="65" width="15" height="15" fill="#059669"/>
-                    <rect x="45" y="70" width="20" height="20" fill="#059669"/>
-                    <rect x="70" y="85" width="15" height="10" fill="#059669"/>
-                  </svg>
+                <div className="relative mx-auto rounded-lg bg-white p-3 shadow-md border w-56 h-56 flex items-center justify-center">
+                  {qrCodeImage ? (
+                    <img src={qrCodeImage} alt="QR Code WhatsApp" className="w-48 h-48 object-contain" />
+                  ) : (
+                    <div className="text-xs text-muted-foreground">QR Code indisponível</div>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-foreground">Instruções no celular:</p>
@@ -215,7 +232,7 @@ export function WhatsappConnectModal() {
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleSimulateScan} className="gap-2 text-xs">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  Simular QR Code Lido
+                  Marcar como Conectado
                 </Button>
               </div>
             )}
