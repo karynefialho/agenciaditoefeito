@@ -196,7 +196,8 @@ function FeedPage() {
         ) : (
           <div className="grid grid-cols-3 gap-0.5 bg-border/40 p-0.5 sm:gap-1">
             {items.map((item) => {
-              const statusInfo = statusBadge[item.status] ?? statusBadge["pending"];
+              const defaultStatus = { label: "Pendente", bg: "bg-amber-500", border: "ring-2 ring-amber-400" };
+              const statusInfo = statusBadge[item.status] ?? defaultStatus;
               return (
                 <Link
                   key={item.id}
