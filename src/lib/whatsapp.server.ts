@@ -30,8 +30,10 @@ async function log(entry: LogInput) {
 }
 
 /**
- * Sends a plain-text WhatsApp message through the Meta WhatsApp Cloud API.
- * Every attempt is recorded in whatsapp_messages, including skipped ones.
+ * Sends a WhatsApp message through:
+ * 1. Z-API (if ZAPI_INSTANCE_ID & ZAPI_TOKEN env vars are set)
+ * 2. Evolution API (if EVOLUTION_API_URL & EVOLUTION_API_KEY env vars are set)
+ * 3. Lovable WhatsApp Gateway (if LOVABLE_API_KEY & WHATSAPP_API_KEY are set)
  */
 export async function sendWhatsApp(args: {
   phone: string | null | undefined;
@@ -39,7 +41,6 @@ export async function sendWhatsApp(args: {
   kind: string;
   clientId?: string | null;
   postId?: string | null;
-  /** Approved Meta template, required outside the 24h window. */
   template?: { name: string; params: string[] };
 }) {
   const phone = args.phone ? onlyDigits(args.phone) : "";
@@ -48,10 +49,56 @@ export async function sendWhatsApp(args: {
     return { sent: false as const, reason: "no-phone" as const };
   }
 
+  // 1. Z-API Integration
+  const zapiInstance = process.env["ZAPI_INSTANCE_ID"];
+  const zapiToken = process.env["ZAPI_TOKEN"];
+  if (zapiInstance && zapiToken) {
+    try {
+      const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`;
+      const zclientToken = process.env["ZAPI_CLIENT_TOKEN"];
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (zclientToken) headers["Client-Token"] = zclientToken;
+
+      const zres = await fetch(zurl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ phone, message: args.body }),
+      });
+      if (zres.ok) {
+        await log({ ...args, phone, status: "sent" });
+        return { sent: true as const };
+      }
+    } catch {
+      /* fallback to gateway */
+    }
+  }
+
+  // 2. Evolution API Integration
+  const evoUrl = process.env["EVOLUTION_API_URL"];
+  const evoKey = process.env["EVOLUTION_API_KEY"];
+  const evoInstance = process.env["EVOLUTION_INSTANCE"];
+  if (evoUrl && evoKey && evoInstance) {
+    try {
+      const url = `${evoUrl.replace(/\/$/, "")}/message/sendText/${evoInstance}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: evoKey },
+        body: JSON.stringify({ number: phone, text: args.body }),
+      });
+      if (res.ok) {
+        await log({ ...args, phone, status: "sent" });
+        return { sent: true as const };
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+
+  // 3. Lovable WhatsApp Gateway
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const connectionKey = process.env["WHATSAPP_API_KEY"];
   if (!lovableKey || !connectionKey) {
-    await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp não configurado" });
+    await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp da agência não conectado" });
     return { sent: false as const, reason: "not-configured" as const };
   }
 
@@ -101,7 +148,6 @@ export async function sendWhatsApp(args: {
       templateError = r.message;
     }
 
-    // Fallback: texto livre (só é entregue se o cliente falou com a agência nas últimas 24h)
     const r = await post({ type: "text", text: { preview_url: true, body: args.body } });
     if (!r.ok) {
       const message = templateError ? `${templateError} | ${r.message}` : r.message;
