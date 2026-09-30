@@ -2,8 +2,14 @@ const GATEWAY_URL = "https://connector-gateway.lovable.dev/whatsapp";
 
 export const APP_URL = "https://agenciaditoefeito.lovable.app";
 
-function onlyDigits(phone: string) {
-  return phone.replace(/\D/g, "");
+function formatWhatsappPhone(phone: string) {
+  let digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  // If 10 or 11 digits (Brazilian DDD + phone), prepend 55
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    digits = "55" + digits;
+  }
+  return digits;
 }
 
 type LogInput = {
@@ -59,9 +65,9 @@ export async function sendWhatsApp(args: {
   postId?: string | null;
   template?: { name: string; params: string[] };
 }) {
-  const phone = args.phone ? onlyDigits(args.phone) : "";
+  const phone = args.phone ? formatWhatsappPhone(args.phone) : "";
   if (!phone) {
-    await log({ ...args, phone: "", status: "skipped", errorMessage: "Sem número de WhatsApp" });
+    await log({ ...args, phone: "", status: "skipped", errorMessage: "Sem número de WhatsApp válido" });
     return { sent: false as const, reason: "no-phone" as const };
   }
 
@@ -133,9 +139,20 @@ export async function sendWhatsApp(args: {
         "Content-Type": "application/json",
       };
 
-      let metaPayload: Record<string, unknown>;
+      const sendMetaReq = async (payload: Record<string, unknown>) => {
+        const metaRes = await fetch(metaUrl, {
+          method: "POST",
+          headers: metaHeaders,
+          body: JSON.stringify(payload),
+        });
+        const metaData = (await metaRes.json().catch(() => ({}))) as { error?: { message?: string } };
+        if (metaRes.ok) return { ok: true as const };
+        return { ok: false as const, message: metaData?.error?.message || `HTTP ${metaRes.status}` };
+      };
+
+      // Try template if provided
       if (args.template) {
-        metaPayload = {
+        const templatePayload = {
           messaging_product: "whatsapp",
           to: phone,
           type: "template",
@@ -150,30 +167,28 @@ export async function sendWhatsApp(args: {
             ],
           },
         };
-      } else {
-        metaPayload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: phone,
-          type: "text",
-          text: { preview_url: true, body: args.body },
-        };
+        const resT = await sendMetaReq(templatePayload);
+        if (resT.ok) {
+          await log({ ...args, phone, status: "sent" });
+          return { sent: true as const };
+        }
       }
 
-      const metaRes = await fetch(metaUrl, {
-        method: "POST",
-        headers: metaHeaders,
-        body: JSON.stringify(metaPayload),
-      });
-
-      const metaData = (await metaRes.json().catch(() => ({}))) as { error?: { message?: string } };
-      if (metaRes.ok) {
+      // Free text fallback
+      const textPayload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: phone,
+        type: "text",
+        text: { preview_url: true, body: args.body },
+      };
+      const resText = await sendMetaReq(textPayload);
+      if (resText.ok) {
         await log({ ...args, phone, status: "sent" });
         return { sent: true as const };
       } else {
-        const errMsg = metaData?.error?.message || `HTTP ${metaRes.status}`;
-        await log({ ...args, phone, status: "failed", errorMessage: errMsg });
-        return { sent: false as const, reason: "error" as const, error: errMsg };
+        await log({ ...args, phone, status: "failed", errorMessage: resText.message });
+        return { sent: false as const, reason: "error" as const, error: resText.message };
       }
     } catch (metaErr) {
       const errMsg = metaErr instanceof Error ? metaErr.message : "Erro na API Meta WhatsApp";

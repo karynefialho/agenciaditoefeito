@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { useQuery } from "@tanstack/react-query";
-import { getAgencySettings, fetchAutoWhatsappQrCode } from "@/lib/app.functions";
+import { getAgencySettings, fetchAutoWhatsappQrCode, listWhatsappLogs } from "@/lib/app.functions";
 
 export function WhatsappConnectModal() {
   const [open, setOpen] = useState(false);
@@ -27,6 +27,13 @@ export function WhatsappConnectModal() {
   const settingsQuery = useQuery({
     queryKey: ["agency-settings"],
     queryFn: () => getAgencySettings(),
+  });
+
+  const logsQuery = useQuery({
+    queryKey: ["whatsapp-logs"],
+    queryFn: () => listWhatsappLogs(),
+    enabled: open,
+    refetchInterval: open ? 5000 : false,
   });
 
   useEffect(() => {
@@ -215,6 +222,48 @@ export function WhatsappConnectModal() {
                 <ExternalLink className="h-3.5 w-3.5" />
                 Testar Envio
               </Button>
+            </div>
+          </div>
+
+          {/* WhatsApp Logs History */}
+          <div className="border-t pt-4 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <span>Histórico de Envios Recentes</span>
+              <Button size="xs" variant="ghost" onClick={() => logsQuery.refetch()} className="h-6 text-[10px]">
+                Atualizar
+              </Button>
+            </h4>
+            <div className="max-h-40 overflow-y-auto rounded-md border text-xs divide-y bg-background">
+              {logsQuery.isLoading ? (
+                <p className="p-3 text-center text-muted-foreground text-xs">Carregando histórico...</p>
+              ) : !logsQuery.data || logsQuery.data.length === 0 ? (
+                <p className="p-3 text-center text-muted-foreground text-xs">Nenhuma mensagem registrada ainda.</p>
+              ) : (
+                logsQuery.data.map((log: { id: string; phone: string; kind: string; status: string; error_message: string | null; created_at: string }) => (
+                  <div key={log.id} className="p-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span>{log.phone}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase">({log.kind})</span>
+                      </div>
+                      {log.error_message && (
+                        <p className="text-[11px] text-destructive truncate mt-0.5">{log.error_message}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                        log.status === 'sent' ? 'bg-emerald-100 text-emerald-800' :
+                        log.status === 'failed' ? 'bg-destructive/15 text-destructive' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {log.status === 'sent' ? 'Entregue ✓' : log.status === 'failed' ? 'Falhou ✕' : log.status}
+                      </span>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

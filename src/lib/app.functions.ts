@@ -876,3 +876,17 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
       qrCode: qrCodeUrl,
     };
   });
+
+export const listWhatsappLogs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const isAdmin = await checkAdmin(context.userId);
+    if (!isAdmin) throw new Error("Apenas a agência pode visualizar o histórico de mensagens.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("whatsapp_messages")
+      .select("id, phone, kind, body, status, error_message, created_at")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    return data ?? [];
+  });
