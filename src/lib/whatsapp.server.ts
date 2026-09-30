@@ -113,8 +113,18 @@ export async function sendWhatsApp(args: {
   }
 
   // 3. Direct Meta WhatsApp Cloud API Integration
-  const metaToken = process.env["META_WHATSAPP_TOKEN"] || process.env["WHATSAPP_ACCESS_TOKEN"] || process.env["META_ACCESS_TOKEN"] || dbSettings["META_WHATSAPP_TOKEN"];
-  const metaPhoneId = process.env["META_WHATSAPP_PHONE_NUMBER_ID"] || process.env["WHATSAPP_PHONE_NUMBER_ID"] || process.env["PHONE_NUMBER_ID"] || dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"];
+  const metaToken =
+    process.env["META_WHATSAPP_TOKEN"] ||
+    process.env["WHATSAPP_ACCESS_TOKEN"] ||
+    process.env["META_ACCESS_TOKEN"] ||
+    process.env["WHATSAPP_TOKEN"] ||
+    dbSettings["META_WHATSAPP_TOKEN"];
+  const metaPhoneId =
+    process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
+    process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
+    process.env["PHONE_NUMBER_ID"] ||
+    dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"];
+
   if (metaToken && metaPhoneId) {
     try {
       const metaUrl = `https://graph.facebook.com/v19.0/${metaPhoneId}/messages`;
@@ -172,22 +182,29 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 4. Lovable WhatsApp Gateway
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const connectionKey = process.env["WHATSAPP_API_KEY"];
-  if (!lovableKey || !connectionKey) {
+  // 4. Lovable WhatsApp Gateway / Native Connector
+  const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
+  const connectionKey =
+    process.env["WHATSAPP_API_KEY"] ||
+    process.env["WHATSAPP_CONNECTION_KEY"] ||
+    process.env["WHATSAPP_CONNECTOR_KEY"] ||
+    process.env["WHATSAPP_TOKEN"];
+
+  const activeKey = connectionKey || lovableKey;
+  if (!activeKey) {
     await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp da agência não conectado" });
     return { sent: false as const, reason: "not-configured" as const };
   }
 
   const post = async (payload: Record<string, unknown>) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
+    if (connectionKey) headers["X-Connection-Api-Key"] = connectionKey;
+    if (!lovableKey && connectionKey) headers["Authorization"] = `Bearer ${connectionKey}`;
+
     const response = await fetch(`${GATEWAY_URL}/messages`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connectionKey,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ messaging_product: "whatsapp", to: phone, ...payload }),
     });
     const text = await response.text();
