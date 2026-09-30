@@ -123,13 +123,6 @@ export async function sendWhatsApp(args: {
   const DEFAULT_META_TOKEN =
     "EAAXBFN1ZBYNMBSpaZBI0NgLbZBnDBbhxlsKINZCHLoRTgD6UqZClIafVkl4jbBWfLhojPjKcnF3DtYIyhpZADVMFkFPTw9Ce0yfntl0saKePZB6SnUvZCCiOb5joZCddGtCZATyIaZAJIePglAtAke4cTu5I5LpG6BBdHt3UYlsNZAMwM9pGY2dTjAPDsWPD0KDSluhqKZAHnuF736ppnAfxffN2ZCThyssNaitUZCOfAPXYxITLqXS6YQWmwPXBoNscUlPMJZBnoyrcNbmZCHIJxl1pZBJd0kH10AjXWauSQeUSKSJQZDZD";
 
-  const metaToken =
-    process.env["META_WHATSAPP_TOKEN"] ||
-    process.env["WHATSAPP_ACCESS_TOKEN"] ||
-    process.env["META_ACCESS_TOKEN"] ||
-    dbSettings["META_WHATSAPP_TOKEN"] ||
-    dbSettings["WHATSAPP_ACCESS_TOKEN"] ||
-    DEFAULT_META_TOKEN;
   const metaPhoneId =
     process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
@@ -138,9 +131,22 @@ export async function sendWhatsApp(args: {
     dbSettings["WHATSAPP_PHONE_NUMBER_ID"] ||
     DEFAULT_META_PHONE_ID;
 
-  if (metaToken && metaPhoneId) {
+  const metaToken =
+    process.env["META_WHATSAPP_TOKEN"] ||
+    process.env["WHATSAPP_ACCESS_TOKEN"] ||
+    process.env["META_ACCESS_TOKEN"] ||
+    dbSettings["META_WHATSAPP_TOKEN"] ||
+    dbSettings["WHATSAPP_ACCESS_TOKEN"] ||
+    DEFAULT_META_TOKEN;
+
+  let activePhoneId = metaPhoneId;
+  if (!activePhoneId || activePhoneId === "118583487845838") {
+    activePhoneId = DEFAULT_META_PHONE_ID;
+  }
+
+  if (metaToken && activePhoneId) {
     try {
-      const metaUrl = `https://graph.facebook.com/v19.0/${metaPhoneId}/messages`;
+      const metaUrl = `https://graph.facebook.com/v19.0/${activePhoneId}/messages`;
       const metaHeaders = {
         Authorization: `Bearer ${metaToken}`,
         "Content-Type": "application/json",
