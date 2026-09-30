@@ -204,10 +204,14 @@ export async function sendWhatsApp(args: {
       }
       metaError = resText.message;
 
-      // Log failure but proceed to Lovable Gateway fallback if token is invalid or request fails
-      await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct: ${metaError}` });
+      // If Meta Direct fails, return its error directly rather than falling through to Lovable Gateway which might have invalid WABA ID
+      const finalError = metaError || "Falha ao enviar mensagem via Meta Cloud API";
+      await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct: ${finalError}` });
+      return { sent: false as const, reason: "error" as const, error: `Meta Direct: ${finalError}` };
     } catch (metaErr) {
-      /* fallback to gateway */
+      const errMs = metaErr instanceof Error ? metaErr.message : "Erro na Meta API";
+      await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct Catch: ${errMs}` });
+      return { sent: false as const, reason: "error" as const, error: `Meta Direct: ${errMs}` };
     }
   }
 
