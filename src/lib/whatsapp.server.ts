@@ -119,18 +119,24 @@ export async function sendWhatsApp(args: {
   }
 
   // 3. Direct Meta WhatsApp Cloud API Integration
+  const DEFAULT_META_PHONE_ID = "1097034492740084";
+  const DEFAULT_META_TOKEN =
+    "EAAXBFN1ZBYNMBSpaZBI0NgLbZBnDBbhxlsKINZCHLoRTgD6UqZClIafVkl4jbBWfLhojPjKcnF3DtYIyhpZADVMFkFPTw9Ce0yfntl0saKePZB6SnUvZCCiOb5joZCddGtCZATyIaZAJIePglAtAke4cTu5I5LpG6BBdHt3UYlsNZAMwM9pGY2dTjAPDsWPD0KDSluhqKZAHnuF736ppnAfxffN2ZCThyssNaitUZCOfAPXYxITLqXS6YQWmwPXBoNscUlPMJZBnoyrcNbmZCHIJxl1pZBJd0kH10AjXWauSQeUSKSJQZDZD";
+
   const metaToken =
     process.env["META_WHATSAPP_TOKEN"] ||
     process.env["WHATSAPP_ACCESS_TOKEN"] ||
     process.env["META_ACCESS_TOKEN"] ||
     dbSettings["META_WHATSAPP_TOKEN"] ||
-    dbSettings["WHATSAPP_ACCESS_TOKEN"];
+    dbSettings["WHATSAPP_ACCESS_TOKEN"] ||
+    DEFAULT_META_TOKEN;
   const metaPhoneId =
     process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["PHONE_NUMBER_ID"] ||
     dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"] ||
-    dbSettings["WHATSAPP_PHONE_NUMBER_ID"];
+    dbSettings["WHATSAPP_PHONE_NUMBER_ID"] ||
+    DEFAULT_META_PHONE_ID;
 
   if (metaToken && metaPhoneId) {
     try {
