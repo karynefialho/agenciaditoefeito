@@ -123,13 +123,14 @@ export async function sendWhatsApp(args: {
     process.env["META_WHATSAPP_TOKEN"] ||
     process.env["WHATSAPP_ACCESS_TOKEN"] ||
     process.env["META_ACCESS_TOKEN"] ||
-    process.env["WHATSAPP_TOKEN"] ||
-    dbSettings["META_WHATSAPP_TOKEN"];
+    dbSettings["META_WHATSAPP_TOKEN"] ||
+    dbSettings["WHATSAPP_ACCESS_TOKEN"];
   const metaPhoneId =
     process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["PHONE_NUMBER_ID"] ||
-    dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"];
+    dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"] ||
+    dbSettings["WHATSAPP_PHONE_NUMBER_ID"];
 
   if (metaToken && metaPhoneId) {
     try {
@@ -150,6 +151,7 @@ export async function sendWhatsApp(args: {
         return { ok: false as const, message: metaData?.error?.message || `HTTP ${metaRes.status}` };
       };
 
+      let metaError: string | null = null;
       // Try template if provided
       if (args.template) {
         const templatePayload = {
@@ -172,6 +174,7 @@ export async function sendWhatsApp(args: {
           await log({ ...args, phone, status: "sent" });
           return { sent: true as const };
         }
+        metaError = resT.message;
       }
 
       // Free text fallback
@@ -186,14 +189,13 @@ export async function sendWhatsApp(args: {
       if (resText.ok) {
         await log({ ...args, phone, status: "sent" });
         return { sent: true as const };
-      } else {
-        await log({ ...args, phone, status: "failed", errorMessage: resText.message });
-        return { sent: false as const, reason: "error" as const, error: resText.message };
       }
+      metaError = resText.message;
+
+      // Log failure but proceed to Lovable Gateway fallback if token is invalid or request fails
+      await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct: ${metaError}` });
     } catch (metaErr) {
-      const errMsg = metaErr instanceof Error ? metaErr.message : "Erro na API Meta WhatsApp";
-      await log({ ...args, phone, status: "failed", errorMessage: errMsg });
-      return { sent: false as const, reason: "error" as const, error: errMsg };
+      /* fallback to gateway */
     }
   }
 

@@ -13,16 +13,20 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-import { useQuery } from "@tanstack/react-query";
-import { getAgencySettings, fetchAutoWhatsappQrCode, listWhatsappLogs } from "@/lib/app.functions";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getAgencySettings, saveAgencySettings, fetchAutoWhatsappQrCode, listWhatsappLogs } from "@/lib/app.functions";
 
 export function WhatsappConnectModal() {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<"disconnected" | "generating" | "qr_ready" | "connected">("disconnected");
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
+
+  const [metaPhoneId, setMetaPhoneId] = useState("");
+  const [metaToken, setMetaToken] = useState("");
 
   const settingsQuery = useQuery({
     queryKey: ["agency-settings"],
@@ -38,12 +42,40 @@ export function WhatsappConnectModal() {
 
   useEffect(() => {
     if (settingsQuery.data) {
-      if (settingsQuery.data["WHATSAPP_SESSION_CONNECTED"] === "true" || settingsQuery.data["ZAPI_INSTANCE_ID"] || settingsQuery.data["EVOLUTION_API_URL"]) {
+      if (settingsQuery.data["META_WHATSAPP_PHONE_NUMBER_ID"]) setMetaPhoneId(settingsQuery.data["META_WHATSAPP_PHONE_NUMBER_ID"]);
+      if (settingsQuery.data["META_WHATSAPP_TOKEN"]) setMetaToken(settingsQuery.data["META_WHATSAPP_TOKEN"]);
+
+      if (
+        settingsQuery.data["WHATSAPP_SESSION_CONNECTED"] === "true" ||
+        settingsQuery.data["META_WHATSAPP_TOKEN"] ||
+        settingsQuery.data["ZAPI_INSTANCE_ID"] ||
+        settingsQuery.data["EVOLUTION_API_URL"]
+      ) {
         setStatus("connected");
-        setConnectedPhone(settingsQuery.data["WHATSAPP_PHONE"] ?? "Conectado");
+        setConnectedPhone(settingsQuery.data["META_WHATSAPP_TOKEN"] ? "Meta API Oficial" : "Conectado");
       }
     }
   }, [settingsQuery.data]);
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: (newSettings: Record<string, string>) => saveAgencySettings({ data: { settings: newSettings } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agency-settings"] });
+      toast.success("Credenciais da Meta salvas no Supabase!");
+      setStatus("connected");
+      setConnectedPhone("Meta API Oficial");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erro ao salvar credenciais");
+    },
+  });
+
+  function handleSaveMetaCredentials() {
+    saveSettingsMutation.mutate({
+      META_WHATSAPP_PHONE_NUMBER_ID: metaPhoneId.trim(),
+      META_WHATSAPP_TOKEN: metaToken.trim(),
+    });
+  }
 
   async function handleGenerateQr() {
     setStatus("generating");
@@ -203,6 +235,37 @@ export function WhatsappConnectModal() {
                 </p>
               </div>
             )}
+          {/* Meta Developers Official Credentials Input */}
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <span>Chaves da API Oficial da Meta (Developers)</span>
+            </h4>
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-muted-foreground">ID do Número de Telefone (Phone Number ID)</label>
+                <Input
+                  placeholder="Ex: 104859201948571"
+                  value={metaPhoneId}
+                  onChange={(e) => setMetaPhoneId(e.target.value)}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-muted-foreground">Token de Acesso da Meta (System / Temporary Token)</label>
+                <Input
+                  type="password"
+                  placeholder="Ex: EAA..."
+                  value={metaToken}
+                  onChange={(e) => setMetaToken(e.target.value)}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button size="xs" variant="secondary" onClick={handleSaveMetaCredentials} disabled={saveSettingsMutation.isPending}>
+                  {saveSettingsMutation.isPending ? "Salvando..." : "Salvar Chaves Meta"}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Direct WhatsApp Test */}
