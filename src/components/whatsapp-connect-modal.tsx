@@ -133,10 +133,10 @@ export function WhatsappConnectModal() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <Smartphone className="h-5 w-5 text-emerald-600" />
-            Conectar WhatsApp (QR Code)
+            Conectar WhatsApp
           </DialogTitle>
           <DialogDescription>
-            Escaneie o QR Code abaixo com seu celular para conectar o WhatsApp da agência de forma automática e definitiva.
+            Conecte a API Oficial da Meta ou escaneie o QR Code abaixo com seu celular.
           </DialogDescription>
         </DialogHeader>
 
@@ -235,6 +235,8 @@ export function WhatsappConnectModal() {
                 </p>
               </div>
             )}
+          </div>
+
           {/* Meta Developers Official Credentials Input */}
           <div className="border-t pt-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
