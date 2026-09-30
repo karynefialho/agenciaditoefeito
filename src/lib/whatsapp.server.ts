@@ -158,9 +158,18 @@ export async function sendWhatsApp(args: {
           headers: metaHeaders,
           body: JSON.stringify(payload),
         });
-        const metaData = (await metaRes.json().catch(() => ({}))) as { error?: { message?: string } };
+        const metaData = (await metaRes.json().catch(() => ({}))) as {
+          error?: { message?: string; code?: number; type?: string };
+        };
         if (metaRes.ok) return { ok: true as const };
-        return { ok: false as const, message: metaData?.error?.message || `HTTP ${metaRes.status}` };
+        const rawMsg = metaData?.error?.message || `HTTP ${metaRes.status}`;
+        if (metaRes.status === 401 || metaData?.error?.code === 190 || rawMsg.toLowerCase().includes("authentication error")) {
+          return {
+            ok: false as const,
+            message: "Token da Meta expirado ou inválido (Authentication Error). Gere um novo token no Meta Business Suite.",
+          };
+        }
+        return { ok: false as const, message: rawMsg };
       };
 
       let metaError: string | null = null;
