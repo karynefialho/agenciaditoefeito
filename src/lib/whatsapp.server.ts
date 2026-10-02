@@ -118,7 +118,7 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 1. Lovable WhatsApp Gateway / Native Connector (Prioritized when connected in Lovable UI)
+  // 1. Lovable WhatsApp Gateway / Native Connector (Prioritized)
   const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
   const connectionKey =
     process.env["WHATSAPP_API_KEY"] ||
@@ -128,8 +128,11 @@ export async function sendWhatsApp(args: {
     dbSettings["WHATSAPP_API_KEY"] ||
     dbSettings["WHATSAPP_TOKEN"];
 
-  const activeKey = connectionKey || lovableKey;
-  if (activeKey) {
+  const isLovableConnected =
+    dbSettings["WHATSAPP_SESSION_CONNECTED"] === "true" ||
+    Boolean(lovableKey || connectionKey);
+
+  if (isLovableConnected || !dbSettings["META_WHATSAPP_TOKEN"]) {
     const post = async (payload: Record<string, unknown>) => {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
@@ -192,30 +195,24 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 2. Direct Meta WhatsApp Cloud API Integration
-  const DEFAULT_META_PHONE_ID = "1320191727841926";
-  const DEFAULT_META_TOKEN =
-    "EAAXBFN1ZBYNMBSlB769i1ne0kHqCE939b9BFNUjqetxOiwMEls3x8RBEZC7qkofJi6puurKT1r2ElJ7zJEQ78AeVitjoEgu5UVgeihMLwB8gi8FsKDgHqu2pIo5naCBFNmYKUV0K6F0JoLLu0dden1IkilurT9MdpN6d7qNcfoSOEkBeoqvgiEy4XUrnmBbPDCMJLJH4KZCVQH2wy9ERM8Br9g38yBbTRI7p4Gm87TZAvBBnWJZAIIuows14cvrs4ZBsltp3SyOsy3JcpQyQLQrZC7PjC9j1dOXYSZBvmQZDZD";
-
+  // 2. Direct Meta WhatsApp Cloud API Integration (Only if explicitly provided via env or DB)
   const metaPhoneId =
     process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["PHONE_NUMBER_ID"] ||
     dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"] ||
-    dbSettings["WHATSAPP_PHONE_NUMBER_ID"] ||
-    DEFAULT_META_PHONE_ID;
+    dbSettings["WHATSAPP_PHONE_NUMBER_ID"];
 
   const metaToken =
     process.env["META_WHATSAPP_TOKEN"] ||
     process.env["WHATSAPP_ACCESS_TOKEN"] ||
     process.env["META_ACCESS_TOKEN"] ||
     dbSettings["META_WHATSAPP_TOKEN"] ||
-    dbSettings["WHATSAPP_ACCESS_TOKEN"] ||
-    DEFAULT_META_TOKEN;
+    dbSettings["WHATSAPP_ACCESS_TOKEN"];
 
-  let activePhoneId = metaPhoneId;
+  let activePhoneId = metaPhoneId || "1320191727841926";
   if (!activePhoneId || activePhoneId === "118583487845838") {
-    activePhoneId = DEFAULT_META_PHONE_ID;
+    activePhoneId = "1320191727841926";
   }
 
   if (metaToken && activePhoneId) {
