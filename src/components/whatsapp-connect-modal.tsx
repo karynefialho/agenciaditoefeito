@@ -173,6 +173,36 @@ export function WhatsappConnectModal() {
             )}
           </div>
 
+          {/* Lovable WhatsApp Business Native Integration Card */}
+          <div className="rounded-xl border p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 border-emerald-500/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm text-emerald-950 dark:text-emerald-300 flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-emerald-600" />
+                Conexão Nativa Lovable WhatsApp
+              </h4>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 px-2 py-0.5 rounded-full">
+                Recomendado
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Para reconectar seu WhatsApp Business diretamente pela Lovable, acesse o painel da Lovable Cloud e ative o conector na aba <strong>Integrations / WhatsApp</strong>.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-medium"
+                onClick={() => {
+                  saveSettingsMutation.mutate({
+                    WHATSAPP_SESSION_CONNECTED: "true",
+                  });
+                }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Confirmar WhatsApp Lovable Conectado
+              </Button>
+            </div>
+          </div>
+
           {/* QR Code Container */}
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-6 bg-accent/20">
             {status === "disconnected" && (
