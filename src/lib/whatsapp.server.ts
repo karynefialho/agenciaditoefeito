@@ -51,7 +51,11 @@ async function getStoredSettings(): Promise<Record<string, string>> {
 }
 
 /**
- * Sends a WhatsApp message EXCLUSIVELY through the native Lovable WhatsApp Gateway.
+ * Sends a WhatsApp message through available integrations:
+ * 1. Z-API (if configured)
+ * 2. Evolution API (if configured)
+ * 3. Direct Meta WhatsApp Cloud API (if custom valid token and Phone ID are provided)
+ * 4. Lovable WhatsApp Gateway (Native Connector)
  */
 export async function sendWhatsApp(args: {
   phone: string | null | undefined;
@@ -69,6 +73,119 @@ export async function sendWhatsApp(args: {
 
   const dbSettings = await getStoredSettings();
 
+  // 1. Z-API Integration
+  const zapiInstance = process.env["ZAPI_INSTANCE_ID"] || dbSettings["ZAPI_INSTANCE_ID"];
+  const zapiToken = process.env["ZAPI_TOKEN"] || dbSettings["ZAPI_TOKEN"];
+  if (zapiInstance && zapiToken) {
+    try {
+      const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`;
+      const zclientToken = process.env["ZAPI_CLIENT_TOKEN"] || dbSettings["ZAPI_CLIENT_TOKEN"];
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (zclientToken) headers["Client-Token"] = zclientToken;
+
+      const zres = await fetch(zurl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ phone, message: args.body }),
+      });
+      if (zres.ok) {
+        await log({ ...args, phone, status: "sent" });
+        return { sent: true as const };
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+
+  // 2. Evolution API Integration
+  const evoUrl = process.env["EVOLUTION_API_URL"] || dbSettings["EVOLUTION_API_URL"];
+  const evoKey = process.env["EVOLUTION_API_KEY"] || dbSettings["EVOLUTION_API_KEY"];
+  const evoInstance = process.env["EVOLUTION_INSTANCE"] || dbSettings["EVOLUTION_INSTANCE"];
+  if (evoUrl && evoKey && evoInstance) {
+    try {
+      const url = `${evoUrl.replace(/\/$/, "")}/message/sendText/${evoInstance}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: evoKey },
+        body: JSON.stringify({ number: phone, text: args.body }),
+      });
+      if (res.ok) {
+        await log({ ...args, phone, status: "sent" });
+        return { sent: true as const };
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+
+  // 3. Direct Meta WhatsApp Cloud API (if valid custom token + Phone ID exist)
+  const metaPhoneId =
+    process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
+    process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
+    dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"] ||
+    dbSettings["WHATSAPP_PHONE_NUMBER_ID"];
+
+  const metaToken =
+    process.env["META_WHATSAPP_TOKEN"] ||
+    process.env["WHATSAPP_ACCESS_TOKEN"] ||
+    dbSettings["META_WHATSAPP_TOKEN"] ||
+    dbSettings["WHATSAPP_ACCESS_TOKEN"];
+
+  if (metaToken && metaPhoneId && metaToken.length > 20 && metaPhoneId !== "118583487845838") {
+    try {
+      const metaUrl = `https://graph.facebook.com/v19.0/${metaPhoneId}/messages`;
+      const metaHeaders = {
+        Authorization: `Bearer ${metaToken}`,
+        "Content-Type": "application/json",
+      };
+
+      const sendMetaReq = async (payload: Record<string, unknown>) => {
+        const metaRes = await fetch(metaUrl, {
+          method: "POST",
+          headers: metaHeaders,
+          body: JSON.stringify(payload),
+        });
+        const metaData = (await metaRes.json().catch(() => ({}))) as {
+          error?: { message?: string; code?: number; type?: string };
+        };
+        if (metaRes.ok) return { ok: true as const };
+        return { ok: false as const, message: metaData?.error?.message || `HTTP ${metaRes.status}` };
+      };
+
+      if (args.template) {
+        const resT = await sendMetaReq({
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "template",
+          template: {
+            name: args.template.name,
+            language: { code: "pt_BR" },
+            components: [{ type: "body", parameters: args.template.params.map((text) => ({ type: "text", text })) }],
+          },
+        });
+        if (resT.ok) {
+          await log({ ...args, phone, status: "sent" });
+          return { sent: true as const };
+        }
+      }
+
+      const resText = await sendMetaReq({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: phone,
+        type: "text",
+        text: { preview_url: true, body: args.body },
+      });
+      if (resText.ok) {
+        await log({ ...args, phone, status: "sent" });
+        return { sent: true as const };
+      }
+    } catch {
+      /* fallback to Lovable Gateway */
+    }
+  }
+
+  // 4. Native Lovable WhatsApp Gateway
   const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
   const connectionKey =
     process.env["WHATSAPP_API_KEY"] ||
@@ -102,7 +219,7 @@ export async function sendWhatsApp(args: {
         /* keep status */
       }
       if (message.includes("118583487845838") || text.includes("118583487845838")) {
-        message = "O Lovable Cloud está configurado com o ID de Negócios (118583487845838) em vez do seu número (5583991095183). No painel do Lovable Cloud (Integrations > WhatsApp), clique em Desconectar e Reconecte selecionando seu número 5583991095183.";
+        message = "O Lovable Cloud está configurado com o ID de Negócios (118583487845838). Para enviar pelo seu número (5583991095183), insira seu Phone Number ID e Access Token no botão 'Conectar WhatsApp'.";
       }
       return { ok: false as const, message };
     }
