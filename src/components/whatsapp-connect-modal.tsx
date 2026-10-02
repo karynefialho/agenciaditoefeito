@@ -28,6 +28,10 @@ export function WhatsappConnectModal() {
   const [metaPhoneId, setMetaPhoneId] = useState("");
   const [metaToken, setMetaToken] = useState("");
 
+  const [evoUrl, setEvoUrl] = useState("");
+  const [evoKey, setEvoKey] = useState("j4uZQSFnL5iX71iLtLCZO39szTjK2NUl");
+  const [evoInstance, setEvoInstance] = useState("ditoefeito");
+
   const settingsQuery = useQuery({
     queryKey: ["agency-settings"],
     queryFn: () => getAgencySettings(),
@@ -44,6 +48,9 @@ export function WhatsappConnectModal() {
     if (settingsQuery.data) {
       if (settingsQuery.data["META_WHATSAPP_PHONE_NUMBER_ID"]) setMetaPhoneId(settingsQuery.data["META_WHATSAPP_PHONE_NUMBER_ID"]);
       if (settingsQuery.data["META_WHATSAPP_TOKEN"]) setMetaToken(settingsQuery.data["META_WHATSAPP_TOKEN"]);
+      if (settingsQuery.data["EVOLUTION_API_URL"]) setEvoUrl(settingsQuery.data["EVOLUTION_API_URL"]);
+      if (settingsQuery.data["EVOLUTION_API_KEY"]) setEvoKey(settingsQuery.data["EVOLUTION_API_KEY"]);
+      if (settingsQuery.data["EVOLUTION_INSTANCE"]) setEvoInstance(settingsQuery.data["EVOLUTION_INSTANCE"]);
 
       if (
         settingsQuery.data["WHATSAPP_SESSION_CONNECTED"] === "true" ||
@@ -52,7 +59,13 @@ export function WhatsappConnectModal() {
         settingsQuery.data["EVOLUTION_API_URL"]
       ) {
         setStatus("connected");
-        setConnectedPhone(settingsQuery.data["META_WHATSAPP_TOKEN"] ? "Meta API Oficial" : "Conectado");
+        setConnectedPhone(
+          settingsQuery.data["EVOLUTION_API_URL"]
+            ? "Evolution API (Próprio)"
+            : settingsQuery.data["META_WHATSAPP_TOKEN"]
+              ? "Meta API Oficial"
+              : "Conectado"
+        );
       }
     }
   }, [settingsQuery.data]);
@@ -61,9 +74,9 @@ export function WhatsappConnectModal() {
     mutationFn: (newSettings: Record<string, string>) => saveAgencySettings({ data: { settings: newSettings } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agency-settings"] });
-      toast.success("Credenciais da Meta salvas no Supabase!");
+      toast.success("Configurações salvas no Supabase!");
       setStatus("connected");
-      setConnectedPhone("Meta API Oficial");
+      setConnectedPhone("Conectado");
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Erro ao salvar credenciais");
@@ -74,6 +87,14 @@ export function WhatsappConnectModal() {
     saveSettingsMutation.mutate({
       META_WHATSAPP_PHONE_NUMBER_ID: metaPhoneId.trim(),
       META_WHATSAPP_TOKEN: metaToken.trim(),
+    });
+  }
+
+  function handleSaveEvolutionCredentials() {
+    saveSettingsMutation.mutate({
+      EVOLUTION_API_URL: evoUrl.trim(),
+      EVOLUTION_API_KEY: evoKey.trim(),
+      EVOLUTION_INSTANCE: evoInstance.trim(),
     });
   }
 
@@ -265,6 +286,51 @@ export function WhatsappConnectModal() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Evolution API v2 Setup Card */}
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <span>Evolution API v2 (Servidor Próprio / Portainer)</span>
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Sem limitações Meta</span>
+            </h4>
+            <div className="space-y-2 rounded-lg border p-3 bg-accent/10">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-muted-foreground">URL da Evolution API</label>
+                <Input
+                  placeholder="Ex: http://SEU_IP:8080 ou https://evo.seu-dominio.com"
+                  value={evoUrl}
+                  onChange={(e) => setEvoUrl(e.target.value)}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">API Key</label>
+                  <Input
+                    type="password"
+                    placeholder="ApiKey definida no Docker"
+                    value={evoKey}
+                    onChange={(e) => setEvoKey(e.target.value)}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">Instância</label>
+                  <Input
+                    placeholder="ditoefeito"
+                    value={evoInstance}
+                    onChange={(e) => setEvoInstance(e.target.value)}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium" onClick={handleSaveEvolutionCredentials} disabled={saveSettingsMutation.isPending}>
+                  {saveSettingsMutation.isPending ? "Salvando..." : "Salvar Evolution API"}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Meta Developers Official Credentials Input */}
