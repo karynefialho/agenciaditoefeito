@@ -101,6 +101,9 @@ export async function sendWhatsApp(args: {
       } catch {
         /* keep status */
       }
+      if (message.includes("118583487845838") || text.includes("118583487845838")) {
+        message = "O Lovable Cloud está configurado com o ID de Negócios (118583487845838) em vez do seu número (5583991095183). No painel do Lovable Cloud (Integrations > WhatsApp), clique em Desconectar e Reconecte selecionando seu número 5583991095183.";
+      }
       return { ok: false as const, message };
     }
     return { ok: true as const };
