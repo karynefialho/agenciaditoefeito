@@ -51,11 +51,7 @@ async function getStoredSettings(): Promise<Record<string, string>> {
 }
 
 /**
- * Sends a WhatsApp message through:
- * 1. Z-API (if ZAPI_INSTANCE_ID & ZAPI_TOKEN env vars or DB settings are set)
- * 2. Evolution API (if EVOLUTION_API_URL & EVOLUTION_API_KEY env vars or DB settings are set)
- * 3. Meta WhatsApp Cloud API
- * 4. Lovable WhatsApp Gateway
+ * Sends a WhatsApp message EXCLUSIVELY through the native Lovable WhatsApp Gateway.
  */
 export async function sendWhatsApp(args: {
   phone: string | null | undefined;
@@ -73,229 +69,83 @@ export async function sendWhatsApp(args: {
 
   const dbSettings = await getStoredSettings();
 
-  // 1. Z-API Integration
-  const zapiInstance = process.env["ZAPI_INSTANCE_ID"] || dbSettings["ZAPI_INSTANCE_ID"];
-  const zapiToken = process.env["ZAPI_TOKEN"] || dbSettings["ZAPI_TOKEN"];
-  if (zapiInstance && zapiToken) {
-    try {
-      const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`;
-      const zclientToken = process.env["ZAPI_CLIENT_TOKEN"] || dbSettings["ZAPI_CLIENT_TOKEN"];
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (zclientToken) headers["Client-Token"] = zclientToken;
+  const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
+  const connectionKey =
+    process.env["WHATSAPP_API_KEY"] ||
+    process.env["WHATSAPP_CONNECTION_KEY"] ||
+    process.env["WHATSAPP_CONNECTOR_KEY"] ||
+    process.env["WHATSAPP_TOKEN"] ||
+    dbSettings["WHATSAPP_API_KEY"] ||
+    dbSettings["WHATSAPP_TOKEN"];
 
-      const zres = await fetch(zurl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ phone, message: args.body }),
-      });
-      if (zres.ok) {
-        await log({ ...args, phone, status: "sent" });
-        return { sent: true as const };
+  const post = async (payload: Record<string, unknown>) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
+    if (connectionKey) headers["X-Connection-Api-Key"] = connectionKey;
+    if (!lovableKey && connectionKey) headers["Authorization"] = `Bearer ${connectionKey}`;
+
+    const response = await fetch(`${GATEWAY_URL}/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: phone,
+        ...payload,
+      }),
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`;
+      try {
+        message = (JSON.parse(text) as { error?: { message?: string } })?.error?.message ?? message;
+      } catch {
+        /* keep status */
       }
-    } catch {
-      /* fallback to gateway */
+      return { ok: false as const, message };
     }
-  }
-
-  // 2. Evolution API Integration
-  const evoUrl = process.env["EVOLUTION_API_URL"] || dbSettings["EVOLUTION_API_URL"];
-  const evoKey = process.env["EVOLUTION_API_KEY"] || dbSettings["EVOLUTION_API_KEY"];
-  const evoInstance = process.env["EVOLUTION_INSTANCE"] || dbSettings["EVOLUTION_INSTANCE"];
-  if (evoUrl && evoKey && evoInstance) {
-    try {
-      const url = `${evoUrl.replace(/\/$/, "")}/message/sendText/${evoInstance}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: evoKey },
-        body: JSON.stringify({ number: phone, text: args.body }),
-      });
-      if (res.ok) {
-        await log({ ...args, phone, status: "sent" });
-        return { sent: true as const };
-      }
-    } catch {
-      /* fallback */
-    }
-  }
-
-  // 1. Lovable WhatsApp Gateway / Native Connector (Always Primary)
-  const tryLovableGateway = async () => {
-    const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
-    const connectionKey =
-      process.env["WHATSAPP_API_KEY"] ||
-      process.env["WHATSAPP_CONNECTION_KEY"] ||
-      process.env["WHATSAPP_CONNECTOR_KEY"] ||
-      process.env["WHATSAPP_TOKEN"] ||
-      dbSettings["WHATSAPP_API_KEY"] ||
-      dbSettings["WHATSAPP_TOKEN"];
-
-    const post = async (payload: Record<string, unknown>) => {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
-      if (connectionKey) headers["X-Connection-Api-Key"] = connectionKey;
-      if (!lovableKey && connectionKey) headers["Authorization"] = `Bearer ${connectionKey}`;
-
-      const response = await fetch(`${GATEWAY_URL}/messages`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone,
-          ...payload,
-        }),
-      });
-      const text = await response.text();
-      if (!response.ok) {
-        let message = `HTTP ${response.status}`;
-        try {
-          message = (JSON.parse(text) as { error?: { message?: string } })?.error?.message ?? message;
-        } catch {
-          /* keep status */
-        }
-        return { ok: false as const, message };
-      }
-      return { ok: true as const };
-    };
-
-    try {
-      let templateError: string | null = null;
-      if (args.template) {
-        const r = await post({
-          type: "template",
-          template: {
-            name: args.template.name,
-            language: { code: "pt_BR" },
-            components: [
-              {
-                type: "body",
-                parameters: args.template.params.map((text) => ({ type: "text", text })),
-              },
-            ],
-          },
-        });
-        if (r.ok) {
-          await log({ ...args, phone, status: "sent" });
-          return { sent: true as const };
-        }
-        templateError = r.message;
-      }
-
-      const r = await post({ type: "text", text: { preview_url: true, body: args.body } });
-      if (r.ok) {
-        await log({
-          ...args,
-          phone,
-          status: "sent",
-          errorMessage: templateError ? `Modelo indisponível, enviado texto livre: ${templateError}` : null,
-        });
-        return { sent: true as const };
-      }
-      return { sent: false as const, error: templateError ? `${templateError} | ${r.message}` : r.message };
-    } catch (err) {
-      return { sent: false as const, error: err instanceof Error ? err.message : "Erro Lovable Gateway" };
-    }
+    return { ok: true as const };
   };
 
-  // Attempt 1: Lovable Gateway
-  const lovableRes = await tryLovableGateway();
-  if (lovableRes.sent) {
-    return { sent: true as const };
-  }
-
-  // 2. Direct Meta WhatsApp Cloud API Integration (Fallback if custom valid token is provided)
-  const metaPhoneId =
-    process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
-    process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
-    process.env["PHONE_NUMBER_ID"] ||
-    dbSettings["META_WHATSAPP_PHONE_NUMBER_ID"] ||
-    dbSettings["WHATSAPP_PHONE_NUMBER_ID"];
-
-  const metaToken =
-    process.env["META_WHATSAPP_TOKEN"] ||
-    process.env["WHATSAPP_ACCESS_TOKEN"] ||
-    process.env["META_ACCESS_TOKEN"] ||
-    dbSettings["META_WHATSAPP_TOKEN"] ||
-    dbSettings["WHATSAPP_ACCESS_TOKEN"];
-
-  let activePhoneId = metaPhoneId || "1320191727841926";
-  if (!activePhoneId || activePhoneId === "118583487845838") {
-    activePhoneId = "1320191727841926";
-  }
-
-  // Only run Meta Direct if an explicit non-empty token is set and not expired fallback
-  if (metaToken && metaToken.length > 20 && activePhoneId) {
-    try {
-      const metaUrl = `https://graph.facebook.com/v19.0/${activePhoneId}/messages`;
-      const metaHeaders = {
-        Authorization: `Bearer ${metaToken}`,
-        "Content-Type": "application/json",
-      };
-
-      const sendMetaReq = async (payload: Record<string, unknown>) => {
-        const metaRes = await fetch(metaUrl, {
-          method: "POST",
-          headers: metaHeaders,
-          body: JSON.stringify(payload),
-        });
-        const metaData = (await metaRes.json().catch(() => ({}))) as {
-          error?: { message?: string; code?: number; type?: string };
-        };
-        if (metaRes.ok) return { ok: true as const };
-        const rawMsg = metaData?.error?.message || `HTTP ${metaRes.status}`;
-        if (metaRes.status === 401 || metaData?.error?.code === 190 || rawMsg.toLowerCase().includes("authentication error")) {
-          return {
-            ok: false as const,
-            message: "Token da Meta expirado ou inválido (Authentication Error). Gere um novo token no Meta Business Suite.",
-          };
-        }
-        return { ok: false as const, message: rawMsg };
-      };
-
-      let metaError: string | null = null;
-      if (args.template) {
-        const templatePayload = {
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "template",
-          template: {
-            name: args.template.name,
-            language: { code: "pt_BR" },
-            components: [
-              {
-                type: "body",
-                parameters: args.template.params.map((text) => ({ type: "text", text })),
-              },
-            ],
-          },
-        };
-        const resT = await sendMetaReq(templatePayload);
-        if (resT.ok) {
-          await log({ ...args, phone, status: "sent" });
-          return { sent: true as const };
-        }
-        metaError = resT.message;
-      }
-
-      const textPayload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: phone,
-        type: "text",
-        text: { preview_url: true, body: args.body },
-      };
-      const resText = await sendMetaReq(textPayload);
-      if (resText.ok) {
+  try {
+    let templateError: string | null = null;
+    if (args.template) {
+      const r = await post({
+        type: "template",
+        template: {
+          name: args.template.name,
+          language: { code: "pt_BR" },
+          components: [
+            {
+              type: "body",
+              parameters: args.template.params.map((text) => ({ type: "text", text })),
+            },
+          ],
+        },
+      });
+      if (r.ok) {
         await log({ ...args, phone, status: "sent" });
         return { sent: true as const };
       }
-      metaError = resText.message;
-    } catch {
-      /* proceed to final check */
+      templateError = r.message;
     }
-  }
 
-  // If Lovable Gateway failed and Meta Direct failed or wasn't configured, return the Lovable result error
-  const finalError = lovableRes.error || "WhatsApp da agência não conectado";
-  await log({ ...args, phone, status: "failed", errorMessage: finalError });
-  return { sent: false as const, reason: "error" as const, error: finalError };
+    const r = await post({ type: "text", text: { preview_url: true, body: args.body } });
+    if (r.ok) {
+      await log({
+        ...args,
+        phone,
+        status: "sent",
+        errorMessage: templateError ? `Modelo indisponível, enviado texto livre: ${templateError}` : null,
+      });
+      return { sent: true as const };
+    }
+
+    const message = templateError ? `${templateError} | ${r.message}` : r.message;
+    await log({ ...args, phone, status: "failed", errorMessage: message });
+    return { sent: false as const, reason: "error" as const, error: message };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro Lovable Gateway";
+    await log({ ...args, phone, status: "failed", errorMessage: message });
+    return { sent: false as const, reason: "error" as const, error: message };
+  }
 }
