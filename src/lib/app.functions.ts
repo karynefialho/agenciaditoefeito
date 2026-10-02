@@ -897,14 +897,50 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
     const sessionToken = `2@DitoEfeito_Agency_WaSession_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(sessionToken)}`;
 
-    // Save active pairing state in DB
-    await supabaseAdmin.from("agency_settings").upsert({ key: "WHATSAPP_PAIRING_TOKEN", value: sessionToken });
-    await supabaseAdmin.from("agency_settings").upsert({ key: "WHATSAPP_SESSION_CONNECTED", value: "true" });
-
+    // Do not set WHATSAPP_SESSION_CONNECTED to true automatically until user scans
     return {
       ok: true,
       qrCode: qrCodeUrl,
     };
+  });
+
+export const checkWhatsappConnectionState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const isAdmin = await checkAdmin(context.userId);
+    if (!isAdmin) return { connected: false, state: "disconnected" };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: settings } = await supabaseAdmin.from("agency_settings").select("key, value");
+    const map: Record<string, string> = {};
+    if (settings) {
+      for (const item of settings) map[item.key] = item.value;
+    }
+
+    const evoUrl = process.env["EVOLUTION_API_URL"] || map["EVOLUTION_API_URL"] || "http://179.242.179.115:8080";
+    const evoKey = process.env["EVOLUTION_API_KEY"] || map["EVOLUTION_API_KEY"] || "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl";
+    const evoInstance = process.env["EVOLUTION_INSTANCE"] || map["EVOLUTION_INSTANCE"] || "ditoefeito";
+
+    if (evoUrl && evoKey) {
+      try {
+        const cleanUrl = evoUrl.replace(/\/$/, "");
+        const res = await fetch(`${cleanUrl}/instance/connectionState/${evoInstance}`, {
+          headers: { apikey: evoKey },
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          instance?: { state?: string };
+        };
+        const state = json.instance?.state || "disconnected";
+        if (state === "open") {
+          return { connected: true, state: "open", provider: "Evolution API" };
+        }
+        return { connected: false, state };
+      } catch {
+        return { connected: false, state: "unreachable" };
+      }
+    }
+
+    return { connected: false, state: "not_configured" };
   });
 
 export const listWhatsappLogs = createServerFn({ method: "GET" })

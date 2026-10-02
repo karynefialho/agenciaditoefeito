@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { QrCode, CheckCircle2, Smartphone, AlertCircle, RefreshCw, Send, ExternalLink } from "lucide-react";
 
@@ -13,22 +13,20 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAgencySettings, saveAgencySettings, fetchAutoWhatsappQrCode, listWhatsappLogs } from "@/lib/app.functions";
+import { useQuery } from "@tanstack/react-query";
+import {
+  fetchAutoWhatsappQrCode,
+  checkWhatsappConnectionState,
+  listWhatsappLogs,
+  saveAgencySettings,
+} from "@/lib/app.functions";
 
 export function WhatsappConnectModal() {
-  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState<"disconnected" | "generating" | "qr_ready" | "connected">("disconnected");
-  const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
+  const [status, setStatus] = useState<"checking" | "disconnected" | "generating" | "qr_ready" | "connected">("checking");
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
-
-  const settingsQuery = useQuery({
-    queryKey: ["agency-settings"],
-    queryFn: () => getAgencySettings(),
-  });
 
   const logsQuery = useQuery({
     queryKey: ["whatsapp-logs"],
@@ -37,67 +35,67 @@ export function WhatsappConnectModal() {
     refetchInterval: open ? 5000 : false,
   });
 
-  useEffect(() => {
-    if (settingsQuery.data) {
-      if (
-        settingsQuery.data["WHATSAPP_SESSION_CONNECTED"] === "true" ||
-        settingsQuery.data["META_WHATSAPP_TOKEN"] ||
-        settingsQuery.data["EVOLUTION_API_URL"]
-      ) {
-        setStatus("connected");
-        setConnectedPhone(settingsQuery.data["EVOLUTION_API_URL"] ? "Evolution API (Próprio)" : "WhatsApp Conectado");
-      }
-    }
-  }, [settingsQuery.data]);
-
-  const saveSettingsMutation = useMutation({
-    mutationFn: (newSettings: Record<string, string>) => saveAgencySettings({ data: { settings: newSettings } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agency-settings"] });
-      toast.success("WhatsApp pareado com sucesso!");
-      setStatus("connected");
-      setConnectedPhone("Conectado");
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Erro ao atualizar status");
-    },
-  });
-
-  async function handleGenerateQr() {
+  const generateQr = useCallback(async () => {
     setStatus("generating");
     setQrCodeImage(null);
 
-    // Save default Evolution settings to DB if not present
-    saveSettingsMutation.mutate({
-      EVOLUTION_API_URL: "http://179.242.179.115:8080",
-      EVOLUTION_API_KEY: "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl",
-      EVOLUTION_INSTANCE: "ditoefeito",
-      WHATSAPP_SESSION_CONNECTED: "true",
-    });
+    // Save default Evolution parameters to agency_settings if missing
+    await saveAgencySettings({
+      data: {
+        settings: {
+          EVOLUTION_API_URL: "http://179.242.179.115:8080",
+          EVOLUTION_API_KEY: "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl",
+          EVOLUTION_INSTANCE: "ditoefeito",
+        },
+      },
+    }).catch(() => {});
 
     try {
       const res = await fetchAutoWhatsappQrCode();
       if (res.ok && res.qrCode) {
         setQrCodeImage(res.qrCode);
         setStatus("qr_ready");
-        toast.success("QR Code do WhatsApp gerado com sucesso!");
+        toast.success("QR Code gerado! Escaneie no celular.");
       } else {
-        toast.error(("message" in res && typeof res.message === "string" ? res.message : "") || "Erro ao conectar com servidor do WhatsApp.");
+        toast.error("Servidor do WhatsApp indisponível no momento.");
         setStatus("disconnected");
       }
     } catch {
-      toast.error("Servidor do WhatsApp indisponível no momento.");
+      toast.error("Erro ao conectar com a Evolution API.");
       setStatus("disconnected");
     }
-  }
+  }, []);
 
-  function handleMarkConnected() {
-    saveSettingsMutation.mutate({
-      WHATSAPP_SESSION_CONNECTED: "true",
-    });
-    setStatus("connected");
-    setConnectedPhone("WhatsApp Conectado");
-    toast.success("WhatsApp da Agência pareado com sucesso!");
+  const checkStatus = useCallback(async () => {
+    setStatus("checking");
+    try {
+      const res = await checkWhatsappConnectionState();
+      if (res.connected) {
+        setStatus("connected");
+      } else {
+        // Automatically generate QR code if not truly connected
+        await generateQr();
+      }
+    } catch {
+      await generateQr();
+    }
+  }, [generateQr]);
+
+  useEffect(() => {
+    if (open) {
+      checkStatus();
+    }
+  }, [open, checkStatus]);
+
+  async function handleDisconnectAndRefresh() {
+    await saveAgencySettings({
+      data: {
+        settings: {
+          WHATSAPP_SESSION_CONNECTED: "",
+        },
+      },
+    }).catch(() => {});
+    await generateQr();
   }
 
   async function handleTestSend() {
@@ -143,18 +141,22 @@ export function WhatsappConnectModal() {
             <div className="flex items-center gap-3">
               {status === "connected" ? (
                 <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              ) : status === "checking" || status === "generating" ? (
+                <RefreshCw className="h-6 w-6 text-amber-500 animate-spin" />
+              ) : status === "qr_ready" ? (
+                <QrCode className="h-6 w-6 text-sky-600" />
               ) : (
                 <AlertCircle className="h-6 w-6 text-amber-500" />
               )}
               <div>
-                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Status da Conexão</p>
+                <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Status Real</p>
                 <p className="font-semibold text-sm">
                   {status === "connected" ? (
-                    <span className="text-emerald-600 flex items-center gap-1.5">
-                      Conectado {connectedPhone ? `(${connectedPhone})` : ""}
-                    </span>
+                    <span className="text-emerald-600 font-medium">WhatsApp Conectado ✓</span>
                   ) : status === "qr_ready" ? (
                     <span className="text-sky-600 font-medium">Aguardando Leitura do QR Code...</span>
+                  ) : status === "checking" ? (
+                    <span className="text-muted-foreground font-medium">Verificando status no servidor...</span>
                   ) : status === "generating" ? (
                     <span className="text-amber-600 font-medium">Gerando QR Code...</span>
                   ) : (
@@ -164,36 +166,18 @@ export function WhatsappConnectModal() {
               </div>
             </div>
             {status === "connected" && (
-              <Button variant="ghost" size="sm" onClick={() => setStatus("disconnected")} className="text-xs text-destructive hover:bg-destructive/10">
-                Desconectar
+              <Button variant="ghost" size="sm" onClick={handleDisconnectAndRefresh} className="text-xs text-destructive hover:bg-destructive/10">
+                Gerar Novo QR Code
               </Button>
             )}
           </div>
 
           {/* QR Code Container */}
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-6 bg-accent/20">
-            {status === "disconnected" && (
-              <div className="text-center space-y-3">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                  <QrCode className="h-8 w-8" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-base">Gerar QR Code</h4>
-                  <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                    Clique no botão abaixo para gerar o QR Code de conexão com a sua Evolution API.
-                  </p>
-                </div>
-                <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-2">
-                  <RefreshCw className="h-4 w-4" />
-                  Exibir QR Code na Tela
-                </Button>
-              </div>
-            )}
-
-            {status === "generating" && (
+            {(status === "checking" || status === "generating") && (
               <div className="py-8 text-center space-y-3">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
-                <p className="text-sm font-medium text-muted-foreground">Inicializando Evolution API e gerando QR Code...</p>
+                <p className="text-sm font-medium text-muted-foreground">Conectando ao servidor Evolution API e gerando QR Code...</p>
               </div>
             )}
 
@@ -203,7 +187,7 @@ export function WhatsappConnectModal() {
                   {qrCodeImage ? (
                     <img src={qrCodeImage} alt="QR Code WhatsApp" className="w-48 h-48 object-contain" />
                   ) : (
-                    <div className="text-xs text-muted-foreground">Carregando QR Code...</div>
+                    <div className="text-xs text-muted-foreground">Carregando imagem do QR Code...</div>
                   )}
                 </div>
                 <div className="space-y-1">
@@ -215,13 +199,13 @@ export function WhatsappConnectModal() {
                   </ol>
                 </div>
                 <div className="flex gap-2 justify-center">
-                  <Button variant="outline" size="sm" onClick={handleGenerateQr} className="gap-1.5 text-xs">
+                  <Button variant="outline" size="sm" onClick={generateQr} className="gap-1.5 text-xs">
                     <RefreshCw className="h-3.5 w-3.5" />
-                    Novo QR Code
+                    Gerar Novo QR Code
                   </Button>
-                  <Button size="sm" onClick={handleMarkConnected} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs">
+                  <Button size="sm" onClick={checkStatus} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Confirmar Conexão
+                    Verificar Conexão
                   </Button>
                 </div>
               </div>
@@ -234,11 +218,24 @@ export function WhatsappConnectModal() {
                 </div>
                 <h4 className="font-semibold text-base text-foreground">WhatsApp Conectado!</h4>
                 <p className="text-xs text-muted-foreground max-w-xs">
-                  A Evolution API está ativa. Todas as notificações para os clientes serão disparadas automaticamente pelo seu número.
+                  A sua Evolution API confirmou conexão ativa! Todas as notificações para os clientes serão disparadas automaticamente pelo seu número.
                 </p>
-                <Button variant="outline" size="sm" onClick={handleGenerateQr} className="gap-1.5 text-xs mt-2">
+                <Button variant="outline" size="sm" onClick={handleDisconnectAndRefresh} className="gap-1.5 text-xs mt-2">
                   <RefreshCw className="h-3.5 w-3.5 text-emerald-600" />
-                  Reconectar / Novo QR Code
+                  Gerar Novo QR Code
+                </Button>
+              </div>
+            )}
+
+            {status === "disconnected" && (
+              <div className="py-4 text-center space-y-3">
+                <AlertCircle className="h-8 w-8 mx-auto text-amber-500" />
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  Não foi possível obter o QR Code da Evolution API. Verifique se o Docker está rodando no IP `179.242.179.115:8080`.
+                </p>
+                <Button onClick={generateQr} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Tentar Novamente
                 </Button>
               </div>
             )}
