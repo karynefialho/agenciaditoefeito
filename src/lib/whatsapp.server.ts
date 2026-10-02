@@ -138,7 +138,13 @@ export async function sendWhatsApp(args: {
       const response = await fetch(`${GATEWAY_URL}/messages`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ messaging_product: "whatsapp", to: phone, ...payload }),
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          phone_number_id: "1320191727841926",
+          phone_id: "1320191727841926",
+          to: phone,
+          ...payload,
+        }),
       });
       const text = await response.text();
       if (!response.ok) {
@@ -147,6 +153,9 @@ export async function sendWhatsApp(args: {
           message = (JSON.parse(text) as { error?: { message?: string } })?.error?.message ?? message;
         } catch {
           /* keep status */
+        }
+        if (message.includes("118583487845838")) {
+          message = "No painel do Lovable (Integrations > WhatsApp), o ID configurado é o ID da Conta de Negócios (118583487845838). Altere o ID no Lovable para o Phone Number ID: 1320191727841926";
         }
         return { ok: false as const, message };
       }
