@@ -118,21 +118,17 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 1. Lovable WhatsApp Gateway / Native Connector (Prioritized)
-  const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
-  const connectionKey =
-    process.env["WHATSAPP_API_KEY"] ||
-    process.env["WHATSAPP_CONNECTION_KEY"] ||
-    process.env["WHATSAPP_CONNECTOR_KEY"] ||
-    process.env["WHATSAPP_TOKEN"] ||
-    dbSettings["WHATSAPP_API_KEY"] ||
-    dbSettings["WHATSAPP_TOKEN"];
+  // 1. Lovable WhatsApp Gateway / Native Connector (Always Primary)
+  const tryLovableGateway = async () => {
+    const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
+    const connectionKey =
+      process.env["WHATSAPP_API_KEY"] ||
+      process.env["WHATSAPP_CONNECTION_KEY"] ||
+      process.env["WHATSAPP_CONNECTOR_KEY"] ||
+      process.env["WHATSAPP_TOKEN"] ||
+      dbSettings["WHATSAPP_API_KEY"] ||
+      dbSettings["WHATSAPP_TOKEN"];
 
-  const isLovableConnected =
-    dbSettings["WHATSAPP_SESSION_CONNECTED"] === "true" ||
-    Boolean(lovableKey || connectionKey);
-
-  if (isLovableConnected || !dbSettings["META_WHATSAPP_TOKEN"]) {
     const post = async (payload: Record<string, unknown>) => {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
@@ -190,12 +186,19 @@ export async function sendWhatsApp(args: {
         });
         return { sent: true as const };
       }
-    } catch {
-      /* fallback to Direct Meta */
+      return { sent: false as const, error: templateError ? `${templateError} | ${r.message}` : r.message };
+    } catch (err) {
+      return { sent: false as const, error: err instanceof Error ? err.message : "Erro Lovable Gateway" };
     }
+  };
+
+  // Attempt 1: Lovable Gateway
+  const lovableRes = await tryLovableGateway();
+  if (lovableRes.sent) {
+    return { sent: true as const };
   }
 
-  // 2. Direct Meta WhatsApp Cloud API Integration (Only if explicitly provided via env or DB)
+  // 2. Direct Meta WhatsApp Cloud API Integration (Fallback if custom valid token is provided)
   const metaPhoneId =
     process.env["META_WHATSAPP_PHONE_NUMBER_ID"] ||
     process.env["WHATSAPP_PHONE_NUMBER_ID"] ||
@@ -215,7 +218,8 @@ export async function sendWhatsApp(args: {
     activePhoneId = "1320191727841926";
   }
 
-  if (metaToken && activePhoneId) {
+  // Only run Meta Direct if an explicit non-empty token is set and not expired fallback
+  if (metaToken && metaToken.length > 20 && activePhoneId) {
     try {
       const metaUrl = `https://graph.facebook.com/v19.0/${activePhoneId}/messages`;
       const metaHeaders = {
@@ -281,17 +285,13 @@ export async function sendWhatsApp(args: {
         return { sent: true as const };
       }
       metaError = resText.message;
-
-      const finalError = metaError || "Falha ao enviar mensagem via Meta Cloud API";
-      await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct: ${finalError}` });
-      return { sent: false as const, reason: "error" as const, error: `Meta Direct: ${finalError}` };
-    } catch (metaErr) {
-      const errMs = metaErr instanceof Error ? metaErr.message : "Erro na Meta API";
-      await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct Catch: ${errMs}` });
-      return { sent: false as const, reason: "error" as const, error: `Meta Direct: ${errMs}` };
+    } catch {
+      /* proceed to final check */
     }
   }
 
-  await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp da agência não conectado" });
-  return { sent: false as const, reason: "not-configured" as const };
+  // If Lovable Gateway failed and Meta Direct failed or wasn't configured, return the Lovable result error
+  const finalError = lovableRes.error || "WhatsApp da agência não conectado";
+  await log({ ...args, phone, status: "failed", errorMessage: finalError });
+  return { sent: false as const, reason: "error" as const, error: finalError };
 }
