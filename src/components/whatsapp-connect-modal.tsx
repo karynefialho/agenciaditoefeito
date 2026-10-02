@@ -88,7 +88,7 @@ export function WhatsappConnectModal() {
         setStatus("qr_ready");
         toast.success("QR Code de conexão gerado com sucesso!");
       } else {
-        toast.error(res.message || "Erro ao conectar com servidor do WhatsApp.");
+        toast.error(("message" in res && typeof res.message === "string" ? res.message : "") || "Erro ao conectar com servidor do WhatsApp.");
         setStatus("disconnected");
       }
     } catch {
@@ -167,7 +167,7 @@ export function WhatsappConnectModal() {
               </div>
             </div>
             {status === "connected" && (
-              <Button variant="ghost" size="xs" onClick={() => setStatus("disconnected")} className="text-xs text-destructive hover:bg-destructive/10">
+              <Button variant="ghost" size="sm" onClick={() => setStatus("disconnected")} className="text-xs text-destructive hover:bg-destructive/10">
                 Desconectar
               </Button>
             )}
@@ -263,7 +263,7 @@ export function WhatsappConnectModal() {
                 />
               </div>
               <div className="flex justify-end pt-1">
-                <Button size="xs" variant="secondary" onClick={handleSaveMetaCredentials} disabled={saveSettingsMutation.isPending}>
+                <Button size="sm" variant="secondary" onClick={handleSaveMetaCredentials} disabled={saveSettingsMutation.isPending}>
                   {saveSettingsMutation.isPending ? "Salvando..." : "Salvar Chaves Meta"}
                 </Button>
               </div>
@@ -294,7 +294,7 @@ export function WhatsappConnectModal() {
           <div className="border-t pt-4 space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
               <span>Histórico de Envios Recentes</span>
-              <Button size="xs" variant="ghost" onClick={() => logsQuery.refetch()} className="h-6 text-[10px]">
+              <Button size="sm" variant="ghost" onClick={() => logsQuery.refetch()} className="h-6 text-[10px]">
                 Atualizar
               </Button>
             </h4>
