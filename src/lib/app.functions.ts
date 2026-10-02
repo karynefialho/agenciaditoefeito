@@ -827,8 +827,8 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
       for (const item of settings) map[item.key] = item.value;
     }
 
-    const evoUrl = process.env["EVOLUTION_API_URL"] || map["EVOLUTION_API_URL"];
-    const evoKey = process.env["EVOLUTION_API_KEY"] || map["EVOLUTION_API_KEY"];
+    const evoUrl = process.env["EVOLUTION_API_URL"] || map["EVOLUTION_API_URL"] || "http://179.242.179.115:8080";
+    const evoKey = process.env["EVOLUTION_API_KEY"] || map["EVOLUTION_API_KEY"] || "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl";
     const evoInstance = process.env["EVOLUTION_INSTANCE"] || map["EVOLUTION_INSTANCE"] || "ditoefeito";
 
     if (evoUrl && evoKey) {

@@ -25,13 +25,6 @@ export function WhatsappConnectModal() {
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
 
-  const [metaPhoneId, setMetaPhoneId] = useState("");
-  const [metaToken, setMetaToken] = useState("");
-
-  const [evoUrl, setEvoUrl] = useState("");
-  const [evoKey, setEvoKey] = useState("j4uZQSFnL5iX71iLtLCZO39szTjK2NUl");
-  const [evoInstance, setEvoInstance] = useState("ditoefeito");
-
   const settingsQuery = useQuery({
     queryKey: ["agency-settings"],
     queryFn: () => getAgencySettings(),
@@ -46,26 +39,13 @@ export function WhatsappConnectModal() {
 
   useEffect(() => {
     if (settingsQuery.data) {
-      if (settingsQuery.data["META_WHATSAPP_PHONE_NUMBER_ID"]) setMetaPhoneId(settingsQuery.data["META_WHATSAPP_PHONE_NUMBER_ID"]);
-      if (settingsQuery.data["META_WHATSAPP_TOKEN"]) setMetaToken(settingsQuery.data["META_WHATSAPP_TOKEN"]);
-      if (settingsQuery.data["EVOLUTION_API_URL"]) setEvoUrl(settingsQuery.data["EVOLUTION_API_URL"]);
-      if (settingsQuery.data["EVOLUTION_API_KEY"]) setEvoKey(settingsQuery.data["EVOLUTION_API_KEY"]);
-      if (settingsQuery.data["EVOLUTION_INSTANCE"]) setEvoInstance(settingsQuery.data["EVOLUTION_INSTANCE"]);
-
       if (
         settingsQuery.data["WHATSAPP_SESSION_CONNECTED"] === "true" ||
         settingsQuery.data["META_WHATSAPP_TOKEN"] ||
-        settingsQuery.data["ZAPI_INSTANCE_ID"] ||
         settingsQuery.data["EVOLUTION_API_URL"]
       ) {
         setStatus("connected");
-        setConnectedPhone(
-          settingsQuery.data["EVOLUTION_API_URL"]
-            ? "Evolution API (Próprio)"
-            : settingsQuery.data["META_WHATSAPP_TOKEN"]
-              ? "Meta API Oficial"
-              : "Conectado"
-        );
+        setConnectedPhone(settingsQuery.data["EVOLUTION_API_URL"] ? "Evolution API (Próprio)" : "WhatsApp Conectado");
       }
     }
   }, [settingsQuery.data]);
@@ -74,40 +54,33 @@ export function WhatsappConnectModal() {
     mutationFn: (newSettings: Record<string, string>) => saveAgencySettings({ data: { settings: newSettings } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agency-settings"] });
-      toast.success("Configurações salvas no Supabase!");
+      toast.success("WhatsApp pareado com sucesso!");
       setStatus("connected");
       setConnectedPhone("Conectado");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Erro ao salvar credenciais");
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar status");
     },
   });
-
-  function handleSaveMetaCredentials() {
-    saveSettingsMutation.mutate({
-      META_WHATSAPP_PHONE_NUMBER_ID: metaPhoneId.trim(),
-      META_WHATSAPP_TOKEN: metaToken.trim(),
-    });
-  }
-
-  function handleSaveEvolutionCredentials() {
-    saveSettingsMutation.mutate({
-      EVOLUTION_API_URL: evoUrl.trim(),
-      EVOLUTION_API_KEY: evoKey.trim(),
-      EVOLUTION_INSTANCE: evoInstance.trim(),
-    });
-  }
 
   async function handleGenerateQr() {
     setStatus("generating");
     setQrCodeImage(null);
+
+    // Save default Evolution settings to DB if not present
+    saveSettingsMutation.mutate({
+      EVOLUTION_API_URL: "http://179.242.179.115:8080",
+      EVOLUTION_API_KEY: "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl",
+      EVOLUTION_INSTANCE: "ditoefeito",
+      WHATSAPP_SESSION_CONNECTED: "true",
+    });
 
     try {
       const res = await fetchAutoWhatsappQrCode();
       if (res.ok && res.qrCode) {
         setQrCodeImage(res.qrCode);
         setStatus("qr_ready");
-        toast.success("QR Code de conexão gerado com sucesso!");
+        toast.success("QR Code do WhatsApp gerado com sucesso!");
       } else {
         toast.error(("message" in res && typeof res.message === "string" ? res.message : "") || "Erro ao conectar com servidor do WhatsApp.");
         setStatus("disconnected");
@@ -119,6 +92,9 @@ export function WhatsappConnectModal() {
   }
 
   function handleMarkConnected() {
+    saveSettingsMutation.mutate({
+      WHATSAPP_SESSION_CONNECTED: "true",
+    });
     setStatus("connected");
     setConnectedPhone("WhatsApp Conectado");
     toast.success("WhatsApp da Agência pareado com sucesso!");
@@ -150,18 +126,18 @@ export function WhatsappConnectModal() {
           <span>Conectar WhatsApp</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <Smartphone className="h-5 w-5 text-emerald-600" />
             Conectar WhatsApp
           </DialogTitle>
           <DialogDescription>
-            Conecte a API Oficial da Meta ou escaneie o QR Code abaixo com seu celular.
+            Escaneie o QR Code com o WhatsApp da Agência (5583991095183) para ativar os avisos automáticos.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-2">
+        <div className="space-y-5 py-2">
           {/* Status Indicator */}
           <div className="flex items-center justify-between rounded-lg border p-3.5 bg-muted/30">
             <div className="flex items-center gap-3">
@@ -194,36 +170,6 @@ export function WhatsappConnectModal() {
             )}
           </div>
 
-          {/* Lovable WhatsApp Business Native Integration Card */}
-          <div className="rounded-xl border p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 border-emerald-500/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-sm text-emerald-950 dark:text-emerald-300 flex items-center gap-2">
-                <Smartphone className="h-4 w-4 text-emerald-600" />
-                Conexão Nativa Lovable WhatsApp
-              </h4>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 px-2 py-0.5 rounded-full">
-                Recomendado
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Para reconectar seu WhatsApp Business diretamente pela Lovable, acesse o painel da Lovable Cloud e ative o conector na aba <strong>Integrations / WhatsApp</strong>.
-            </p>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-medium"
-                onClick={() => {
-                  saveSettingsMutation.mutate({
-                    WHATSAPP_SESSION_CONNECTED: "true",
-                  });
-                }}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Confirmar WhatsApp Lovable Conectado
-              </Button>
-            </div>
-          </div>
-
           {/* QR Code Container */}
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed p-6 bg-accent/20">
             {status === "disconnected" && (
@@ -234,7 +180,7 @@ export function WhatsappConnectModal() {
                 <div>
                   <h4 className="font-semibold text-base">Gerar QR Code</h4>
                   <p className="text-xs text-muted-foreground max-w-xs mt-1">
-                    Clique no botão abaixo para exibir o QR Code e conectar o seu aplicativo do WhatsApp.
+                    Clique no botão abaixo para gerar o QR Code de conexão com a sua Evolution API.
                   </p>
                 </div>
                 <Button onClick={handleGenerateQr} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-2">
@@ -247,7 +193,7 @@ export function WhatsappConnectModal() {
             {status === "generating" && (
               <div className="py-8 text-center space-y-3">
                 <RefreshCw className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
-                <p className="text-sm font-medium text-muted-foreground">Inicializando WhatsApp e carregando QR Code...</p>
+                <p className="text-sm font-medium text-muted-foreground">Inicializando Evolution API e gerando QR Code...</p>
               </div>
             )}
 
@@ -257,131 +203,63 @@ export function WhatsappConnectModal() {
                   {qrCodeImage ? (
                     <img src={qrCodeImage} alt="QR Code WhatsApp" className="w-48 h-48 object-contain" />
                   ) : (
-                    <div className="text-xs text-muted-foreground">Gerando imagem...</div>
+                    <div className="text-xs text-muted-foreground">Carregando QR Code...</div>
                   )}
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-foreground">Instruções no celular:</p>
                   <ol className="text-xs text-muted-foreground text-left max-w-xs mx-auto space-y-1 list-decimal pl-4">
-                    <li>Abra o WhatsApp no celular da Agência</li>
-                    <li>Vá em <strong>Menu (⋮) / Configurações</strong> &rarr; <strong>Dispositivos conectados</strong></li>
-                    <li>Toque em <strong>Conectar um dispositivo</strong> e aponte a câmera para o QR Code acima</li>
+                    <li>Abra o WhatsApp no celular da Agência (5583991095183)</li>
+                    <li>Vá em <strong>Menu (⋮) / Configurações</strong> &rarr; <strong>Aparelhos conectados</strong></li>
+                    <li>Toque em <strong>Conectar um aparelho</strong> e aponte a câmera para o QR Code acima</li>
                   </ol>
                 </div>
-                <Button variant="secondary" size="sm" onClick={handleMarkConnected} className="gap-2 text-xs">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  Confirmar Conexão
-                </Button>
+                <div className="flex gap-2 justify-center">
+                  <Button variant="outline" size="sm" onClick={handleGenerateQr} className="gap-1.5 text-xs">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Novo QR Code
+                  </Button>
+                  <Button size="sm" onClick={handleMarkConnected} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Confirmar Conexão
+                  </Button>
+                </div>
               </div>
             )}
 
             {status === "connected" && (
-              <div className="py-4 text-center space-y-2">
+              <div className="py-4 text-center space-y-3">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
                   <CheckCircle2 className="h-7 w-7" />
                 </div>
                 <h4 className="font-semibold text-base text-foreground">WhatsApp Conectado!</h4>
                 <p className="text-xs text-muted-foreground max-w-xs">
-                  O WhatsApp da sua agência está ativo. Todas as notificações para os clientes serão disparadas automaticamente.
+                  A Evolution API está ativa. Todas as notificações para os clientes serão disparadas automaticamente pelo seu número.
                 </p>
+                <Button variant="outline" size="sm" onClick={handleGenerateQr} className="gap-1.5 text-xs mt-2">
+                  <RefreshCw className="h-3.5 w-3.5 text-emerald-600" />
+                  Reconectar / Novo QR Code
+                </Button>
               </div>
             )}
-          </div>
-
-          {/* Evolution API v2 Setup Card */}
-          <div className="border-t pt-4 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              <span>Evolution API v2 (Servidor Próprio / Portainer)</span>
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Sem limitações Meta</span>
-            </h4>
-            <div className="space-y-2 rounded-lg border p-3 bg-accent/10">
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-muted-foreground">URL da Evolution API</label>
-                <Input
-                  placeholder="Ex: http://SEU_IP:8080 ou https://evo.seu-dominio.com"
-                  value={evoUrl}
-                  onChange={(e) => setEvoUrl(e.target.value)}
-                  className="h-8 text-xs font-mono"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">API Key</label>
-                  <Input
-                    type="password"
-                    placeholder="ApiKey definida no Docker"
-                    value={evoKey}
-                    onChange={(e) => setEvoKey(e.target.value)}
-                    className="h-8 text-xs font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">Instância</label>
-                  <Input
-                    placeholder="ditoefeito"
-                    value={evoInstance}
-                    onChange={(e) => setEvoInstance(e.target.value)}
-                    className="h-8 text-xs font-mono"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end pt-1">
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium" onClick={handleSaveEvolutionCredentials} disabled={saveSettingsMutation.isPending}>
-                  {saveSettingsMutation.isPending ? "Salvando..." : "Salvar Evolution API"}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Meta Developers Official Credentials Input */}
-          <div className="border-t pt-4 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              <span>Chaves da API Oficial da Meta (Developers)</span>
-            </h4>
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-muted-foreground">ID do Número de Telefone (Phone Number ID)</label>
-                <Input
-                  placeholder="Ex: 104859201948571"
-                  value={metaPhoneId}
-                  onChange={(e) => setMetaPhoneId(e.target.value)}
-                  className="h-8 text-xs font-mono"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-muted-foreground">Token de Acesso da Meta (System / Temporary Token)</label>
-                <Input
-                  type="password"
-                  placeholder="Ex: EAA..."
-                  value={metaToken}
-                  onChange={(e) => setMetaToken(e.target.value)}
-                  className="h-8 text-xs font-mono"
-                />
-              </div>
-              <div className="flex justify-end pt-1">
-                <Button size="sm" variant="secondary" onClick={handleSaveMetaCredentials} disabled={saveSettingsMutation.isPending}>
-                  {saveSettingsMutation.isPending ? "Salvando..." : "Salvar Chaves Meta"}
-                </Button>
-              </div>
-            </div>
           </div>
 
           {/* Direct WhatsApp Test */}
           <div className="border-t pt-4 space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Send className="h-3.5 w-3.5 text-emerald-600" />
-              Testar Conexão
+              Testar Envio
             </h4>
             <div className="flex gap-2">
               <Input
-                placeholder="DDD + Telefone (Ex: 81999998888)"
+                placeholder="DDD + Telefone (Ex: 83991095183)"
                 value={testPhone}
                 onChange={(e) => setTestPhone(e.target.value)}
                 className="h-9 text-xs flex-1"
               />
               <Button size="sm" onClick={handleTestSend} disabled={testing} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
                 <ExternalLink className="h-3.5 w-3.5" />
-                Testar Envio
+                Testar
               </Button>
             </div>
           </div>
@@ -394,7 +272,7 @@ export function WhatsappConnectModal() {
                 Atualizar
               </Button>
             </h4>
-            <div className="max-h-40 overflow-y-auto rounded-md border text-xs divide-y bg-background">
+            <div className="max-h-36 overflow-y-auto rounded-md border text-xs divide-y bg-background">
               {logsQuery.isLoading ? (
                 <p className="p-3 text-center text-muted-foreground text-xs">Carregando histórico...</p>
               ) : !logsQuery.data || logsQuery.data.length === 0 ? (

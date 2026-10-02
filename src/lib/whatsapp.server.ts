@@ -98,9 +98,9 @@ export async function sendWhatsApp(args: {
   }
 
   // 2. Evolution API Integration
-  const evoUrl = process.env["EVOLUTION_API_URL"] || dbSettings["EVOLUTION_API_URL"];
-  const evoKey = process.env["EVOLUTION_API_KEY"] || dbSettings["EVOLUTION_API_KEY"];
-  const evoInstance = process.env["EVOLUTION_INSTANCE"] || dbSettings["EVOLUTION_INSTANCE"];
+  const evoUrl = process.env["EVOLUTION_API_URL"] || dbSettings["EVOLUTION_API_URL"] || "http://179.242.179.115:8080";
+  const evoKey = process.env["EVOLUTION_API_KEY"] || dbSettings["EVOLUTION_API_KEY"] || "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl";
+  const evoInstance = process.env["EVOLUTION_INSTANCE"] || dbSettings["EVOLUTION_INSTANCE"] || "ditoefeito";
   if (evoUrl && evoKey && evoInstance) {
     try {
       const cleanUrl = evoUrl.replace(/\/$/, "");
