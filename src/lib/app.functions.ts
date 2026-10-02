@@ -318,7 +318,7 @@ export const getPost = createServerFn({ method: "POST" })
     const { data: post, error } = await supabaseAdmin
       .from("posts")
       .select(
-        "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username, ig_picture_url)",
+        "id, client_id, kind, caption, scheduled_at, status, feedback, published_at, error_message, ig_media_id, clients(name, ig_username, ig_picture_url, whatsapp_phone)",
       )
       .eq("id", data.id)
       .maybeSingle();

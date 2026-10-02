@@ -67,7 +67,7 @@ function toLocalInput(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-type ClientInfo = { name?: string; ig_username?: string | null; ig_picture_url?: string | null };
+type ClientInfo = { name?: string; ig_username?: string | null; ig_picture_url?: string | null; whatsapp_phone?: string | null };
 
 function PostDetail() {
   const navigate = useNavigate();
