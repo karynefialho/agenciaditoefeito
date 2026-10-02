@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { QrCode, CheckCircle2, Smartphone, AlertCircle, RefreshCw, Send, ExternalLink } from "lucide-react";
+import { QrCode, CheckCircle2, Smartphone, AlertCircle, RefreshCw, Send, ExternalLink, Settings, ChevronDown, ChevronUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import {
   checkWhatsappConnectionState,
   listWhatsappLogs,
   saveAgencySettings,
+  getAgencySettings,
 } from "@/lib/app.functions";
 
 export function WhatsappConnectModal() {
@@ -27,6 +28,25 @@ export function WhatsappConnectModal() {
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const [evoUrl, setEvoUrl] = useState("http://179.242.179.115:8080");
+  const [evoKey, setEvoKey] = useState("j4uZQSFnL5iX71iLtLCZO39szTjK2NUl");
+  const [evoInstance, setEvoInstance] = useState("ditoefeito");
+
+  const settingsQuery = useQuery({
+    queryKey: ["agency-settings"],
+    queryFn: () => getAgencySettings(),
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (settingsQuery.data) {
+      if (settingsQuery.data["EVOLUTION_API_URL"]) setEvoUrl(settingsQuery.data["EVOLUTION_API_URL"]);
+      if (settingsQuery.data["EVOLUTION_API_KEY"]) setEvoKey(settingsQuery.data["EVOLUTION_API_KEY"]);
+      if (settingsQuery.data["EVOLUTION_INSTANCE"]) setEvoInstance(settingsQuery.data["EVOLUTION_INSTANCE"]);
+    }
+  }, [settingsQuery.data]);
 
   const logsQuery = useQuery({
     queryKey: ["whatsapp-logs"],
@@ -35,17 +55,20 @@ export function WhatsappConnectModal() {
     refetchInterval: open ? 5000 : false,
   });
 
-  const generateQr = useCallback(async () => {
+  const generateQr = useCallback(async (customUrl?: string, customKey?: string, customInstance?: string) => {
     setStatus("generating");
     setQrCodeImage(null);
 
-    // Save default Evolution parameters to agency_settings if missing
+    const urlToSave = customUrl ?? evoUrl;
+    const keyToSave = customKey ?? evoKey;
+    const instanceToSave = customInstance ?? evoInstance;
+
     await saveAgencySettings({
       data: {
         settings: {
-          EVOLUTION_API_URL: "http://179.242.179.115:8080",
-          EVOLUTION_API_KEY: "j4uZQSFnL5iX71iLtLCZO39szTjK2NUl",
-          EVOLUTION_INSTANCE: "ditoefeito",
+          EVOLUTION_API_URL: urlToSave.trim(),
+          EVOLUTION_API_KEY: keyToSave.trim(),
+          EVOLUTION_INSTANCE: instanceToSave.trim(),
         },
       },
     }).catch(() => {});
@@ -65,7 +88,7 @@ export function WhatsappConnectModal() {
       toast.error("Erro ao conectar com a Evolution API.");
       setStatus("disconnected");
     }
-  }, []);
+  }, [evoUrl, evoKey, evoInstance]);
 
   const checkStatus = useCallback(async () => {
     setStatus("checking");
@@ -74,7 +97,6 @@ export function WhatsappConnectModal() {
       if (res.connected) {
         setStatus("connected");
       } else {
-        // Automatically generate QR code if not truly connected
         await generateQr();
       }
     } catch {
@@ -87,6 +109,10 @@ export function WhatsappConnectModal() {
       checkStatus();
     }
   }, [open, checkStatus]);
+
+  async function handleSaveAndRefresh() {
+    await generateQr(evoUrl, evoKey, evoInstance);
+  }
 
   async function handleDisconnectAndRefresh() {
     await saveAgencySettings({
@@ -200,7 +226,7 @@ export function WhatsappConnectModal() {
                   </ol>
                 </div>
                 <div className="flex gap-2 justify-center">
-                  <Button variant="outline" size="sm" onClick={generateQr} className="gap-1.5 text-xs">
+                  <Button variant="outline" size="sm" onClick={() => generateQr()} className="gap-1.5 text-xs">
                     <RefreshCw className="h-3.5 w-3.5" />
                     Gerar Novo QR Code
                   </Button>
@@ -232,12 +258,69 @@ export function WhatsappConnectModal() {
               <div className="py-4 text-center space-y-3">
                 <AlertCircle className="h-8 w-8 mx-auto text-amber-500" />
                 <p className="text-xs text-muted-foreground max-w-xs">
-                  Não foi possível obter o QR Code da Evolution API. Verifique se o Docker está rodando no IP `179.242.179.115:8080`.
+                  Não foi possível obter o QR Code. Verifique se o Docker está ativo e se a ApiKey da Evolution API bate com a configurada.
                 </p>
-                <Button onClick={generateQr} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
+                <Button onClick={() => generateQr()} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" />
                   Tentar Novamente
                 </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Toggleable Advanced Settings Section */}
+          <div className="border-t pt-3 space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSettings(!showSettings)}
+              className="w-full justify-between text-xs text-muted-foreground hover:text-foreground h-8"
+            >
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Settings className="h-3.5 w-3.5 text-emerald-600" />
+                Configurações da Evolution API (URL / Chave)
+              </span>
+              {showSettings ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </Button>
+
+            {showSettings && (
+              <div className="space-y-3 p-3 rounded-lg border bg-accent/10 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">URL da Evolution API</label>
+                  <Input
+                    placeholder="http://179.242.179.115:8080 ou http://localhost:8080"
+                    value={evoUrl}
+                    onChange={(e) => setEvoUrl(e.target.value)}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">API Key (Docker)</label>
+                    <Input
+                      type="password"
+                      placeholder="ApiKey do Docker"
+                      value={evoKey}
+                      onChange={(e) => setEvoKey(e.target.value)}
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">Instância</label>
+                    <Input
+                      placeholder="ditoefeito"
+                      value={evoInstance}
+                      onChange={(e) => setEvoInstance(e.target.value)}
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5" onClick={handleSaveAndRefresh}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Salvar & Recarregar QR Code
+                  </Button>
+                </div>
               </div>
             )}
           </div>
