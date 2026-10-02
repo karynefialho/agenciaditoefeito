@@ -57,7 +57,8 @@ export function WhatsappConnectModal() {
         setStatus("qr_ready");
         toast.success("QR Code gerado! Escaneie no celular.");
       } else {
-        toast.error("Servidor do WhatsApp indisponível no momento.");
+        const msg = ("message" in res && typeof res.message === "string" ? res.message : "") || "Não foi possível obter o QR Code da Evolution API.";
+        toast.error(msg);
         setStatus("disconnected");
       }
     } catch {

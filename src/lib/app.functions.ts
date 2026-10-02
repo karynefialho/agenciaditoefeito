@@ -849,13 +849,20 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
             }),
           });
           const createJson = (await createRes.json().catch(() => ({}))) as {
-            qrcode?: { base64?: string };
+            qrcode?: { base64?: string; code?: string };
             base64?: string;
+            code?: string;
           };
-          const qr = createJson.qrcode?.base64 || createJson.base64;
-          if (qr) {
-            return { ok: true, qrCode: qr };
+          const b64 = createJson.qrcode?.base64 || createJson.base64;
+          const code = createJson.qrcode?.code || createJson.code;
+
+          if (b64) {
+            return { ok: true, qrCode: b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}` };
           }
+          if (code) {
+            return { ok: true, qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(code)}` };
+          }
+
           // Retry connect after creation
           res = await fetch(connectUrl, { headers: { apikey: evoKey } });
         }
@@ -863,44 +870,33 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
         const json = (await res.json().catch(() => ({}))) as {
           base64?: string;
           code?: string;
-          qrcode?: { base64?: string };
+          qrcode?: { base64?: string; code?: string };
         };
-        const qrCode = json.base64 || json.qrcode?.base64 || json.code;
-        if (qrCode) {
-          return { ok: true, qrCode: qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}` };
+        const b64 = json.base64 || json.qrcode?.base64;
+        const code = json.code || json.qrcode?.code;
+
+        if (b64) {
+          return { ok: true, qrCode: b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}` };
         }
+        if (code) {
+          return { ok: true, qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(code)}` };
+        }
+
+        return {
+          ok: false,
+          message: `Evolution API (${evoInstance}): O servidor não retornou a imagem do QR Code. Verifique se o container está ativo.`,
+        };
       } catch (err) {
-        console.error("Evolution QR Code fetch failed:", err);
+        return {
+          ok: false,
+          message: `Não foi possível acessar a Evolution API em ${evoUrl}. Verifique a conexão com o servidor e se a porta 8080 está liberada: ${err instanceof Error ? err.message : String(err)}`,
+        };
       }
     }
 
-    const zapiInstance = process.env["ZAPI_INSTANCE_ID"] || map["ZAPI_INSTANCE_ID"];
-    const zapiToken = process.env["ZAPI_TOKEN"] || map["ZAPI_TOKEN"];
-    if (zapiInstance && zapiToken) {
-      const zurl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/qr-code/image`;
-      return { ok: true, qrCode: zurl };
-    }
-
-    const defaultGatewayUrl = "https://connector-gateway.lovable.dev/whatsapp/qr";
-    try {
-      const res = await fetch(defaultGatewayUrl, { method: "POST" });
-      if (res.ok) {
-        const json = (await res.json()) as { qrCode?: string; base64?: string };
-        const qr = json.base64 || json.qrCode;
-        if (qr) return { ok: true, qrCode: qr };
-      }
-    } catch {
-      /* fallback */
-    }
-
-    // High-availability automatic live pairing QR Code fallback
-    const sessionToken = `2@DitoEfeito_Agency_WaSession_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(sessionToken)}`;
-
-    // Do not set WHATSAPP_SESSION_CONNECTED to true automatically until user scans
     return {
-      ok: true,
-      qrCode: qrCodeUrl,
+      ok: false,
+      message: "Evolution API não configurada. Defina a URL e API Key.",
     };
   });
 
