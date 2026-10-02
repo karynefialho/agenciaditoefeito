@@ -835,10 +835,32 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
       try {
         const cleanUrl = evoUrl.replace(/\/$/, "");
         const connectUrl = `${cleanUrl}/instance/connect/${evoInstance}`;
-        let res = await fetch(connectUrl, { headers: { apikey: evoKey } });
 
-        // If instance does not exist (404), create it automatically
-        if (res.status === 404) {
+        const extractQr = (obj: unknown): { b64?: string; code?: string } => {
+          if (!obj || typeof obj !== "object") return {};
+          const o = obj as Record<string, unknown>;
+          let b64 = typeof o["base64"] === "string" ? o["base64"] : undefined;
+          let code = typeof o["code"] === "string" ? o["code"] : undefined;
+          if (o["qrcode"]) {
+            if (typeof o["qrcode"] === "string" && !b64) b64 = o["qrcode"];
+            else if (typeof o["qrcode"] === "object") {
+              const q = o["qrcode"] as Record<string, unknown>;
+              if (!b64 && typeof q["base64"] === "string") b64 = q["base64"];
+              if (!code && typeof q["code"] === "string") code = q["code"];
+            }
+          }
+          if (o["instance"] && typeof o["instance"] === "object") {
+            const i = o["instance"] as Record<string, unknown>;
+            if (i["qrcode"] && typeof i["qrcode"] === "object") {
+              const q = i["qrcode"] as Record<string, unknown>;
+              if (!b64 && typeof q["base64"] === "string") b64 = q["base64"];
+              if (!code && typeof q["code"] === "string") code = q["code"];
+            }
+          }
+          return { b64, code };
+        };
+
+        const createInstance = async () => {
           const createRes = await fetch(`${cleanUrl}/instance/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json", apikey: evoKey },
@@ -848,48 +870,48 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
               integration: "WHATSAPP-BAILEYS",
             }),
           });
-          const createJson = (await createRes.json().catch(() => ({}))) as {
-            qrcode?: { base64?: string; code?: string };
-            base64?: string;
-            code?: string;
-          };
-          const b64 = createJson.qrcode?.base64 || createJson.base64;
-          const code = createJson.qrcode?.code || createJson.code;
-
-          if (b64) {
-            return { ok: true, qrCode: b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}` };
-          }
-          if (code) {
-            return { ok: true, qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(code)}` };
-          }
-
-          // Retry connect after creation
-          res = await fetch(connectUrl, { headers: { apikey: evoKey } });
-        }
-
-        const json = (await res.json().catch(() => ({}))) as {
-          base64?: string;
-          code?: string;
-          qrcode?: { base64?: string; code?: string };
+          const createJson = await createRes.json().catch(() => ({}));
+          return extractQr(createJson);
         };
-        const b64 = json.base64 || json.qrcode?.base64;
-        const code = json.code || json.qrcode?.code;
 
-        if (b64) {
-          return { ok: true, qrCode: b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}` };
+        let res = await fetch(connectUrl, { headers: { apikey: evoKey } });
+        let json = await res.json().catch(() => ({}));
+        let qrData = extractQr(json);
+
+        // If instance does not exist or returned no QR, recreate instance
+        if (!qrData.b64 && !qrData.code) {
+          // Delete old/stuck instance if it exists
+          await fetch(`${cleanUrl}/instance/delete/${evoInstance}`, {
+            method: "DELETE",
+            headers: { apikey: evoKey },
+          }).catch(() => {});
+
+          // Re-create instance to force brand new QR code
+          qrData = await createInstance();
+
+          // Try connect one more time if still empty
+          if (!qrData.b64 && !qrData.code) {
+            res = await fetch(connectUrl, { headers: { apikey: evoKey } });
+            json = await res.json().catch(() => ({}));
+            qrData = extractQr(json);
+          }
         }
-        if (code) {
-          return { ok: true, qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(code)}` };
+
+        if (qrData.b64) {
+          return { ok: true, qrCode: qrData.b64.startsWith("data:") ? qrData.b64 : `data:image/png;base64,${qrData.b64}` };
+        }
+        if (qrData.code) {
+          return { ok: true, qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData.code)}` };
         }
 
         return {
           ok: false,
-          message: `Evolution API (${evoInstance}): O servidor não retornou a imagem do QR Code. Verifique se o container está ativo.`,
+          message: `Evolution API (${evoInstance}): O servidor recusou a geração do QR Code. Verifique se a chave de API (ApiKey) '${evoKey}' está correta no Docker.`,
         };
       } catch (err) {
         return {
           ok: false,
-          message: `Não foi possível acessar a Evolution API em ${evoUrl}. Verifique a conexão com o servidor e se a porta 8080 está liberada: ${err instanceof Error ? err.message : String(err)}`,
+          message: `Não foi possível acessar a Evolution API em ${evoUrl}. Verifique se o Docker está rodando na porta 8080: ${err instanceof Error ? err.message : String(err)}`,
         };
       }
     }
