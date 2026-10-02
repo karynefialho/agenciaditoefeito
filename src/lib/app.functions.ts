@@ -833,14 +833,44 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
 
     if (evoUrl && evoKey) {
       try {
-        const url = `${evoUrl.replace(/\/$/, "")}/instance/connect/${evoInstance}`;
-        const res = await fetch(url, { headers: { apikey: evoKey } });
-        const json = (await res.json()) as { base64?: string; code?: string };
-        if (json.base64) {
-          return { ok: true, qrCode: json.base64 };
+        const cleanUrl = evoUrl.replace(/\/$/, "");
+        const connectUrl = `${cleanUrl}/instance/connect/${evoInstance}`;
+        let res = await fetch(connectUrl, { headers: { apikey: evoKey } });
+
+        // If instance does not exist (404), create it automatically
+        if (res.status === 404) {
+          const createRes = await fetch(`${cleanUrl}/instance/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: evoKey },
+            body: JSON.stringify({
+              instanceName: evoInstance,
+              qrcode: true,
+              integration: "WHATSAPP-BAILEYS",
+            }),
+          });
+          const createJson = (await createRes.json().catch(() => ({}))) as {
+            qrcode?: { base64?: string };
+            base64?: string;
+          };
+          const qr = createJson.qrcode?.base64 || createJson.base64;
+          if (qr) {
+            return { ok: true, qrCode: qr };
+          }
+          // Retry connect after creation
+          res = await fetch(connectUrl, { headers: { apikey: evoKey } });
         }
-      } catch {
-        /* fallback */
+
+        const json = (await res.json().catch(() => ({}))) as {
+          base64?: string;
+          code?: string;
+          qrcode?: { base64?: string };
+        };
+        const qrCode = json.base64 || json.qrcode?.base64 || json.code;
+        if (qrCode) {
+          return { ok: true, qrCode: qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}` };
+        }
+      } catch (err) {
+        console.error("Evolution QR Code fetch failed:", err);
       }
     }
 

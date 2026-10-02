@@ -103,18 +103,36 @@ export async function sendWhatsApp(args: {
   const evoInstance = process.env["EVOLUTION_INSTANCE"] || dbSettings["EVOLUTION_INSTANCE"];
   if (evoUrl && evoKey && evoInstance) {
     try {
-      const url = `${evoUrl.replace(/\/$/, "")}/message/sendText/${evoInstance}`;
+      const cleanUrl = evoUrl.replace(/\/$/, "");
+      const url = `${cleanUrl}/message/sendText/${evoInstance}`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: evoKey },
         body: JSON.stringify({ number: phone, text: args.body }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         await log({ ...args, phone, status: "sent" });
         return { sent: true as const };
       }
-    } catch {
-      /* fallback */
+
+      // If Evolution API is explicitly configured but returned an error, log details
+      let evoErrorMessage = `Evolution API HTTP ${res.status}`;
+      if (res.status === 404) {
+        evoErrorMessage = `Evolution API: A instância '${evoInstance}' não existe no servidor (${cleanUrl}). Abra 'Conectar WhatsApp' para gerar o QR Code.`;
+      } else if (res.status === 400 || res.status === 401) {
+        const detail = (data as { response?: { message?: string[] } })?.response?.message?.[0] || (data as { message?: string })?.message || "Instância deslogada ou chave inválida";
+        evoErrorMessage = `Evolution API (${evoInstance}): ${detail}. Abra 'Conectar WhatsApp' e escaneie o QR Code.`;
+      } else if ((data as { message?: string })?.message) {
+        evoErrorMessage = `Evolution API: ${(data as { message?: string }).message}`;
+      }
+
+      await log({ ...args, phone, status: "failed", errorMessage: evoErrorMessage });
+      return { sent: false as const, reason: "error" as const, error: evoErrorMessage };
+    } catch (err) {
+      const connErr = `Não foi possível conectar ao servidor Evolution API (${evoUrl}). Verifique se o Docker está rodando e a porta 8080 liberada: ${err instanceof Error ? err.message : String(err)}`;
+      await log({ ...args, phone, status: "failed", errorMessage: connErr });
+      return { sent: false as const, reason: "error" as const, error: connErr };
     }
   }
 
