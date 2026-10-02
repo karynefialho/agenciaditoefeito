@@ -118,7 +118,81 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 3. Direct Meta WhatsApp Cloud API Integration
+  // 1. Lovable WhatsApp Gateway / Native Connector (Prioritized when connected in Lovable UI)
+  const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
+  const connectionKey =
+    process.env["WHATSAPP_API_KEY"] ||
+    process.env["WHATSAPP_CONNECTION_KEY"] ||
+    process.env["WHATSAPP_CONNECTOR_KEY"] ||
+    process.env["WHATSAPP_TOKEN"] ||
+    dbSettings["WHATSAPP_API_KEY"] ||
+    dbSettings["WHATSAPP_TOKEN"];
+
+  const activeKey = connectionKey || lovableKey;
+  if (activeKey) {
+    const post = async (payload: Record<string, unknown>) => {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
+      if (connectionKey) headers["X-Connection-Api-Key"] = connectionKey;
+      if (!lovableKey && connectionKey) headers["Authorization"] = `Bearer ${connectionKey}`;
+
+      const response = await fetch(`${GATEWAY_URL}/messages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ messaging_product: "whatsapp", to: phone, ...payload }),
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          message = (JSON.parse(text) as { error?: { message?: string } })?.error?.message ?? message;
+        } catch {
+          /* keep status */
+        }
+        return { ok: false as const, message };
+      }
+      return { ok: true as const };
+    };
+
+    try {
+      let templateError: string | null = null;
+      if (args.template) {
+        const r = await post({
+          type: "template",
+          template: {
+            name: args.template.name,
+            language: { code: "pt_BR" },
+            components: [
+              {
+                type: "body",
+                parameters: args.template.params.map((text) => ({ type: "text", text })),
+              },
+            ],
+          },
+        });
+        if (r.ok) {
+          await log({ ...args, phone, status: "sent" });
+          return { sent: true as const };
+        }
+        templateError = r.message;
+      }
+
+      const r = await post({ type: "text", text: { preview_url: true, body: args.body } });
+      if (r.ok) {
+        await log({
+          ...args,
+          phone,
+          status: "sent",
+          errorMessage: templateError ? `Modelo indisponível, enviado texto livre: ${templateError}` : null,
+        });
+        return { sent: true as const };
+      }
+    } catch {
+      /* fallback to Direct Meta */
+    }
+  }
+
+  // 2. Direct Meta WhatsApp Cloud API Integration
   const DEFAULT_META_PHONE_ID = "1320191727841926";
   const DEFAULT_META_TOKEN =
     "EAAXBFN1ZBYNMBSlB769i1ne0kHqCE939b9BFNUjqetxOiwMEls3x8RBEZC7qkofJi6puurKT1r2ElJ7zJEQ78AeVitjoEgu5UVgeihMLwB8gi8FsKDgHqu2pIo5naCBFNmYKUV0K6F0JoLLu0dden1IkilurT9MdpN6d7qNcfoSOEkBeoqvgiEy4XUrnmBbPDCMJLJH4KZCVQH2wy9ERM8Br9g38yBbTRI7p4Gm87TZAvBBnWJZAIIuows14cvrs4ZBsltp3SyOsy3JcpQyQLQrZC7PjC9j1dOXYSZBvmQZDZD";
@@ -173,7 +247,6 @@ export async function sendWhatsApp(args: {
       };
 
       let metaError: string | null = null;
-      // Try template if provided
       if (args.template) {
         const templatePayload = {
           messaging_product: "whatsapp",
@@ -198,7 +271,6 @@ export async function sendWhatsApp(args: {
         metaError = resT.message;
       }
 
-      // Free text fallback
       const textPayload = {
         messaging_product: "whatsapp",
         recipient_type: "individual",
@@ -213,7 +285,6 @@ export async function sendWhatsApp(args: {
       }
       metaError = resText.message;
 
-      // If Meta Direct fails, return its error directly rather than falling through to Lovable Gateway which might have invalid WABA ID
       const finalError = metaError || "Falha ao enviar mensagem via Meta Cloud API";
       await log({ ...args, phone, status: "failed", errorMessage: `Meta Direct: ${finalError}` });
       return { sent: false as const, reason: "error" as const, error: `Meta Direct: ${finalError}` };
@@ -224,83 +295,6 @@ export async function sendWhatsApp(args: {
     }
   }
 
-  // 4. Lovable WhatsApp Gateway / Native Connector
-  const lovableKey = process.env["LOVABLE_API_KEY"] || process.env["LOVABLE_KEY"];
-  const connectionKey =
-    process.env["WHATSAPP_API_KEY"] ||
-    process.env["WHATSAPP_CONNECTION_KEY"] ||
-    process.env["WHATSAPP_CONNECTOR_KEY"] ||
-    process.env["WHATSAPP_TOKEN"];
-
-  const activeKey = connectionKey || lovableKey;
-  if (!activeKey) {
-    await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp da agência não conectado" });
-    return { sent: false as const, reason: "not-configured" as const };
-  }
-
-  const post = async (payload: Record<string, unknown>) => {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (lovableKey) headers["Authorization"] = `Bearer ${lovableKey}`;
-    if (connectionKey) headers["X-Connection-Api-Key"] = connectionKey;
-    if (!lovableKey && connectionKey) headers["Authorization"] = `Bearer ${connectionKey}`;
-
-    const response = await fetch(`${GATEWAY_URL}/messages`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ messaging_product: "whatsapp", to: phone, ...payload }),
-    });
-    const text = await response.text();
-    if (!response.ok) {
-      let message = `HTTP ${response.status}`;
-      try {
-        message = (JSON.parse(text) as { error?: { message?: string } })?.error?.message ?? message;
-      } catch {
-        /* keep status */
-      }
-      return { ok: false as const, message };
-    }
-    return { ok: true as const };
-  };
-
-  try {
-    let templateError: string | null = null;
-    if (args.template) {
-      const r = await post({
-        type: "template",
-        template: {
-          name: args.template.name,
-          language: { code: "pt_BR" },
-          components: [
-            {
-              type: "body",
-              parameters: args.template.params.map((text) => ({ type: "text", text })),
-            },
-          ],
-        },
-      });
-      if (r.ok) {
-        await log({ ...args, phone, status: "sent" });
-        return { sent: true as const };
-      }
-      templateError = r.message;
-    }
-
-    const r = await post({ type: "text", text: { preview_url: true, body: args.body } });
-    if (!r.ok) {
-      const message = templateError ? `${templateError} | ${r.message}` : r.message;
-      await log({ ...args, phone, status: "failed", errorMessage: message });
-      return { sent: false as const, reason: "error" as const, error: message };
-    }
-    await log({
-      ...args,
-      phone,
-      status: "sent",
-      errorMessage: templateError ? `Modelo indisponível, enviado texto livre: ${templateError}` : null,
-    });
-    return { sent: true as const };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Erro desconhecido";
-    await log({ ...args, phone, status: "failed", errorMessage: message });
-    return { sent: false as const, reason: "error" as const, error: message };
-  }
+  await log({ ...args, phone, status: "skipped", errorMessage: "WhatsApp da agência não conectado" });
+  return { sent: false as const, reason: "not-configured" as const };
 }
