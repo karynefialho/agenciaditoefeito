@@ -542,8 +542,7 @@ export const updatePost = createServerFn({ method: "POST" })
 
 export const publishNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string }) => input)
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }: { data: { id: string }; context: { userId: string } }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const isAdmin = await checkAdmin(context.userId);
     if (!isAdmin) throw new Error("Apenas a agência pode publicar manualmente.");
@@ -554,7 +553,16 @@ export const publishNow = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (!post) throw new Error("Post não encontrado.");
-    if (post.status !== "approved") throw new Error("O cliente ainda não aprovou este post.");
+    if (post.status === "published" || post.status === "publishing") {
+      throw new Error("Este post já foi publicado.");
+    }
+
+    if (post.status !== "approved") {
+      await supabaseAdmin
+        .from("posts")
+        .update({ status: "approved", approved_at: new Date().toISOString() })
+        .eq("id", data.id);
+    }
 
     const { publishPostById } = await import("@/lib/publish.server");
     await publishPostById(data.id);

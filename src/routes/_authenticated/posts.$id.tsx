@@ -438,15 +438,22 @@ function PostDetail() {
                     <p className="text-xs text-muted-foreground">
                       Depois de aprovado, o post é publicado automaticamente no horário agendado.
                     </p>
-                    {isAdmin && data.status === "approved" && (
-                      <Button
-                        variant="secondary"
-                        className="w-full"
-                        disabled={publish.isPending}
-                        onClick={() => publish.mutate()}
-                      >
-                        {publish.isPending ? "Publicando..." : "Publicar agora"}
-                      </Button>
+                    {isAdmin && data.status !== "published" && data.status !== "publishing" && (
+                      <div className="pt-2 border-t mt-3">
+                        <Button
+                          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium gap-2 shadow-sm"
+                          disabled={publish.isPending}
+                          onClick={() => {
+                            if (data.status !== "approved" && !confirm("Este post ainda não foi aprovado pelo cliente. Deseja aprovar e publicar no Instagram agora mesmo?")) {
+                              return;
+                            }
+                            publish.mutate();
+                          }}
+                        >
+                          <Send className="h-4 w-4" />
+                          {publish.isPending ? "Publicando no Instagram..." : "Publicar agora no Instagram"}
+                        </Button>
+                      </div>
                     )}
                   </>
                 )}

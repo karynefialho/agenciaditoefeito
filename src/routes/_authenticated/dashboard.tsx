@@ -66,15 +66,17 @@ function Dashboard() {
           </p>
         )}
         {posts.data?.map((post) => (
-          <Link
+          <div
             key={post.id}
-            to="/posts/$id"
-            params={{ id: post.id }}
             className="flex flex-wrap items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-primary/50"
           >
-            <div className="min-w-0 flex-1">
+            <Link
+              to="/posts/$id"
+              params={{ id: post.id }}
+              className="min-w-0 flex-1 group"
+            >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">
+                <span className="font-medium group-hover:text-primary transition-colors">
                   {(post as { clients?: { name?: string } }).clients?.name ?? "Cliente"}
                 </span>
                 <FormatBadge kind={post.kind} />
@@ -82,10 +84,15 @@ function Dashboard() {
               <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
                 {post.caption || "Sem legenda"}
               </p>
-            </div>
+            </Link>
             <div className="text-sm text-muted-foreground">{formatDate(post.scheduled_at)}</div>
             <StatusBadge status={post.status} />
-          </Link>
+            <Button asChild size="sm" variant="outline" className="text-xs font-medium">
+              <Link to="/posts/$id" params={{ id: post.id }}>
+                Ver / Publicar
+              </Link>
+            </Button>
+          </div>
         ))}
       </div>
     </AppShell>
