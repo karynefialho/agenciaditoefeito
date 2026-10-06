@@ -886,22 +886,30 @@ export const fetchAutoWhatsappQrCode = createServerFn({ method: "POST" })
         let json = await res.json().catch(() => ({}));
         let qrData = extractQr(json);
 
-        // If instance does not exist or returned no QR, recreate instance
+        // If instance does not exist, create it
+        if (res.status === 404) {
+          qrData = await createInstance();
+        }
+
+        // If count is 0 or no QR data, trigger logout & restart instance to force Baileys socket initialization
         if (!qrData.b64 && !qrData.code) {
-          // Delete old/stuck instance if it exists
-          await fetch(`${cleanUrl}/instance/delete/${evoInstance}`, {
+          await fetch(`${cleanUrl}/instance/logout/${evoInstance}`, {
             method: "DELETE",
             headers: { apikey: evoKey },
           }).catch(() => {});
 
-          // Re-create instance to force brand new QR code
-          qrData = await createInstance();
+          await fetch(`${cleanUrl}/instance/restart/${evoInstance}`, {
+            method: "POST",
+            headers: { apikey: evoKey },
+          }).catch(() => {});
 
-          // Try connect one more time if still empty
-          if (!qrData.b64 && !qrData.code) {
+          // Poll up to 3 times (1s interval) for Baileys socket to emit QR code
+          for (let attempt = 0; attempt < 3; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
             res = await fetch(connectUrl, { headers: { apikey: evoKey } });
             json = await res.json().catch(() => ({}));
             qrData = extractQr(json);
+            if (qrData.b64 || qrData.code) break;
           }
         }
 
